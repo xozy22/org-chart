@@ -1,0 +1,19 @@
+[
+  { "id": "1",  "parentId": null, "name": "Anna Müller",      "title": "CEO",                       "department": "Vorstand",      "email": "anna.mueller@beispiel.de",   "phone": "+49 89 1000 0001", "imageUrl": "", "country": "de" },
+  { "id": "2",  "parentId": "1",  "name": "Bernd Schmidt",    "title": "CTO",                       "department": "Technik",        "email": "bernd.schmidt@beispiel.de",  "phone": "+49 89 1000 0002", "imageUrl": "", "country": "de" },
+  { "id": "3",  "parentId": "1",  "name": "Clara Weber",      "title": "CFO",                       "department": "Finanzen",       "email": "clara.weber@beispiel.de",    "phone": "+41 44 200 0003",  "imageUrl": "", "country": "ch" },
+  { "id": "4",  "parentId": "1",  "name": "Daniel Fischer",   "title": "COO",                       "department": "Operations",     "email": "daniel.fischer@beispiel.de", "phone": "+43 1 500 0004",   "imageUrl": "", "country": "at" },
+  { "id": "5",  "parentId": "2",  "name": "Eva Becker",       "title": "Head of Engineering",       "department": "Technik",        "email": "eva.becker@beispiel.de",     "phone": "+49 89 1000 0005", "imageUrl": "", "country": "de" },
+  { "id": "6",  "parentId": "2",  "name": "Felix Hoffmann",   "title": "Head of Product",           "department": "Technik",        "email": "felix.hoffmann@beispiel.de", "phone": "+1 415 555 0006",  "imageUrl": "", "country": "us" },
+  { "id": "7",  "parentId": "5",  "name": "Greta Wagner",     "title": "Senior Engineer",           "department": "Technik",        "email": "greta.wagner@beispiel.de",   "phone": "",                 "imageUrl": "", "country": "de" },
+  { "id": "8",  "parentId": "5",  "name": "Hannes Krüger",    "title": "Senior Engineer",           "department": "Technik",        "email": "hannes.krueger@beispiel.de", "phone": "+48 22 600 0008",  "imageUrl": "", "country": "pl" },
+  { "id": "9",  "parentId": "6",  "name": "Ines Bauer",       "title": "Product Manager",           "department": "Technik",        "email": "ines.bauer@beispiel.de",     "phone": "+33 1 4000 0009",  "imageUrl": "", "country": "fr" },
+  { "id": "10", "parentId": "3",  "name": "Jonas Klein",      "title": "Controller",                "department": "Finanzen",       "email": "jonas.klein@beispiel.de",    "phone": "+41 44 200 0010",  "imageUrl": "", "country": "ch" },
+  { "id": "11", "parentId": "3",  "name": "Karin Vogel",      "title": "Buchhaltung",               "department": "Finanzen",       "email": "karin.vogel@beispiel.de",    "phone": "+49 89 1000 0011", "imageUrl": "", "country": "de" },
+  { "id": "12", "parentId": "4",  "name": "Lukas Schulz",     "title": "Head of Operations",        "department": "Operations",     "email": "lukas.schulz@beispiel.de",   "phone": "+43 1 500 0012",   "imageUrl": "", "country": "at" },
+  { "id": "13", "parentId": "12", "name": "Marie Neumann",    "title": "Operations Lead",           "department": "Operations",     "email": "marie.neumann@beispiel.de",  "phone": "+34 91 700 0013",  "imageUrl": "", "country": "es" },
+
+  { "id": "100", "parentId": null,  "name": "Externe Beratung GmbH", "title": "Partner",         "department": "Beratung",       "email": "kontakt@beratung.de",        "phone": "+49 30 9000 1000", "imageUrl": "", "country": "de" },
+  { "id": "101", "parentId": "100", "name": "Olaf Richter",          "title": "Lead Consultant", "department": "Beratung",       "email": "olaf.richter@beratung.de",   "phone": "+49 30 9000 1001", "imageUrl": "", "country": "de" },
+  { "id": "102", "parentId": "100", "name": "Petra Hartmann",        "title": "Auditorin",       "department": "Audit",          "email": "petra.hartmann@beratung.de", "phone": "",                 "imageUrl": "", "country": "de" }
+]

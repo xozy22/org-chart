@@ -1,0 +1,1001 @@
+/* ===========================================================
+   Org-Chart Builder — Fortinet-inspired theme
+   Brand palette: Fortinet Red #DA291C · Black #1A1A1A · White
+   =========================================================== */
+:root {
+  /* Fortinet brand */
+  --ft-red:        #DA291C;
+  --ft-red-hover:  #B8221A;
+  --ft-red-soft:   #FBE9E7;
+  --ft-black:      #1A1A1A;
+  --ft-night:      #0F1115;
+  --ft-charcoal:   #2A2D33;
+  --ft-graphite:   #3A3F47;
+  --ft-silver:     #C9CDD3;
+
+  /* Neutrals */
+  --bg:            #F4F5F7;
+  --surface:       #FFFFFF;
+  --border:        #E3E5E9;
+  --border-strong: #C9CDD3;
+  --text:          #1A1A1A;
+  --text-muted:    #6B7280;
+
+  /* Semantic */
+  --primary:       var(--ft-red);
+  --primary-hover: var(--ft-red-hover);
+  --danger:        #B8221A;
+  --danger-hover:  #8E1A14;
+
+  --shadow-sm: 0 1px 2px rgba(15, 17, 21, 0.06);
+  --shadow-md: 0 6px 18px rgba(15, 17, 21, 0.10);
+  --shadow-lg: 0 18px 48px rgba(15, 17, 21, 0.28);
+
+  --radius-sm: 4px;
+  --radius:    8px;
+  --radius-lg: 10px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* =========================================================
+   Toolbar — dark Fortinet-style header
+   ========================================================= */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px 0 40px;          /* extra space on the left for the red marker bar */
+  height: 60px;
+  background: linear-gradient(180deg, var(--ft-night) 0%, var(--ft-black) 100%);
+  color: white;
+  border-bottom: 3px solid var(--ft-red);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+  flex-wrap: nowrap;
+  z-index: 5;
+  position: relative;
+}
+
+/* Brand mark left of toolbar */
+.toolbar::before {
+  content: 'ORG·CHART';
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 2.5px;
+  color: white;
+  padding-right: 18px;
+  margin-right: 6px;
+  border-right: 1px solid var(--ft-graphite);
+  position: relative;
+  white-space: nowrap;
+}
+
+/* Vertical red marker bar — sits in the toolbar's left padding, doesn't overlap text */
+.toolbar::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: 22px;
+  width: 6px;
+  height: 24px;
+  background: var(--ft-red);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-search {
+  flex: 1;
+  min-width: 160px;
+  justify-content: flex-start;
+}
+
+.toolbar-search input {
+  width: 100%;
+  max-width: 360px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--ft-graphite);
+  border-radius: var(--radius);
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.06);
+  color: white;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.toolbar-search input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.toolbar-search input:focus {
+  outline: none;
+  border-color: var(--ft-red);
+  background: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 0 0 3px rgba(218, 41, 28, 0.30);
+}
+
+/* =========================================================
+   Buttons
+   ========================================================= */
+.btn {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--ft-graphite);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: var(--ft-silver);
+  color: white;
+}
+
+.btn:active { transform: translateY(1px); }
+
+.btn:focus-visible {
+  outline: 2px solid var(--ft-red);
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  background: var(--ft-red);
+  border-color: var(--ft-red);
+  color: white;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.20);
+}
+
+.btn-primary:hover {
+  background: var(--ft-red-hover);
+  border-color: var(--ft-red-hover);
+  color: white;
+}
+
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+}
+
+.btn-danger:hover {
+  background: var(--danger-hover);
+  border-color: var(--danger-hover);
+}
+
+/* Buttons inside light surfaces (modal) — neutral default, branded variants keep their look */
+.modal-body .btn,
+.modal-footer .btn {
+  background: white;
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.modal-body .btn:hover,
+.modal-footer .btn:hover {
+  background: var(--bg);
+  border-color: var(--ft-graphite);
+  color: var(--text);
+}
+
+/* Re-assert primary/danger styling so the modal's neutral rule above doesn't win */
+.modal-footer .btn-primary,
+.modal-body .btn-primary {
+  background: var(--ft-red);
+  border-color: var(--ft-red);
+  color: white;
+}
+.modal-footer .btn-primary:hover,
+.modal-body .btn-primary:hover {
+  background: var(--ft-red-hover);
+  border-color: var(--ft-red-hover);
+  color: white;
+}
+
+.modal-footer .btn-danger,
+.modal-body .btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+}
+.modal-footer .btn-danger:hover,
+.modal-body .btn-danger:hover {
+  background: var(--danger-hover);
+  border-color: var(--danger-hover);
+  color: white;
+}
+
+/* =========================================================
+   Filter bar — secondary toolbar with structured dropdowns
+   ========================================================= */
+.filterbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 20px;
+  background: #FAFBFC;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  z-index: 4;
+}
+
+.filterbar-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  padding-right: 6px;
+  border-right: 1px solid var(--border);
+}
+
+.filter-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.filter-select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 32px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: white;
+  font-size: 13px;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  /* Custom caret */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.filter-select:hover {
+  border-color: var(--ft-graphite);
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--ft-red);
+  box-shadow: 0 0 0 3px rgba(218, 41, 28, 0.18);
+}
+
+/* Highlight active (non-default) filters */
+.filter-select:not([data-empty="true"]):not(:placeholder-shown) {
+  /* placeholder-shown doesn't apply to selects in all browsers — so we
+     fall back to a JS-friendly approach: highlight when value !== '' */
+}
+
+.filter-select option[value=""] { color: var(--text-muted); }
+
+#filter-root-wrap[hidden] { display: none !important; }
+
+.filter-summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.btn.btn-ghost {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text);
+  height: 32px;
+  font-size: 12px;
+}
+
+.btn.btn-ghost:hover {
+  background: white;
+  border-color: var(--ft-red);
+  color: var(--ft-red);
+}
+
+/* =========================================================
+   Chart canvas
+   ========================================================= */
+.chart {
+  flex: 1;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(15, 17, 21, 0.07) 1px, transparent 0) 0 0 / 24px 24px,
+    linear-gradient(180deg, #FAFBFC 0%, #F0F2F5 100%);
+}
+
+/* SVG link styling — d3-org-chart uses .link inside chart group.
+   The selectors are deliberately ancestor-free so they also apply when
+   the chart's SVG is rendered detached (e.g. inside the export pipeline,
+   where the surrounding `.chart` container is not present). */
+svg path.link,
+.chart svg path.link {
+  stroke: var(--ft-graphite) !important;
+  stroke-width: 1.5px !important;
+  fill: none !important;
+  opacity: 0.55;
+}
+
+/* =========================================================
+   Node card — Fortinet-style with red accent stripe
+   ========================================================= */
+.node-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 14px 12px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: inherit;
+  transition: box-shadow 0.18s, border-color 0.18s, transform 0.18s;
+  overflow: hidden;
+}
+
+/* Top accent bar — Fortinet red by default, or the subtree's root colour
+   when the card belongs to a multi-root subtree (`--root-color` is set
+   inline by the renderer for every node descended from a root). */
+.node-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--root-color, var(--ft-red));
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+/* Subtle dark left rail on hover */
+.node-card::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 0;
+  width: 0;
+  background: var(--ft-black);
+  transition: width 0.18s ease;
+}
+
+.node-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--ft-graphite);
+  transform: translateY(-1px);
+}
+
+.node-card:hover::after {
+  width: 3px;
+}
+
+.node-card-top {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.node-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--ft-black);
+  border: 2px solid var(--root-color, var(--ft-red));
+}
+
+.node-avatar--initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: white;
+  background: linear-gradient(135deg, var(--ft-charcoal) 0%, var(--ft-black) 100%);
+  letter-spacing: 0.5px;
+}
+
+.node-card-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.node-card-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ft-black);
+  letter-spacing: -0.1px;
+  min-width: 0;
+}
+
+.node-card-name-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Country flag in the card name row — small, sharp, with subtle frame */
+.node-flag.fi {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 13px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(15, 17, 21, 0.12), 0 1px 2px rgba(15, 17, 21, 0.10);
+  background-size: cover;
+  background-position: center;
+  display: inline-block;
+}
+
+.node-card-title {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.node-card-dept {
+  font-size: 10.5px;
+  color: var(--ft-red);
+  font-weight: 700;
+  background: var(--ft-red-soft);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  align-self: flex-start;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.node-card-email,
+.node-card-phone {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Action buttons — inside the card, top-right, fade-in on hover */
+.node-card-actions {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  display: flex;
+  gap: 3px;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.node-card:hover .node-card-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.node-action {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: white;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--ft-charcoal);
+  transition: all 0.12s;
+  font-weight: 700;
+}
+
+.node-action:hover {
+  background: var(--ft-black);
+  color: white;
+  border-color: var(--ft-black);
+}
+
+.node-action--add:hover {
+  background: var(--ft-red);
+  border-color: var(--ft-red);
+}
+
+.node-action--delete:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Highlight (search) */
+.node-card.highlighted,
+.highlighted .node-card {
+  border-color: var(--ft-red);
+  box-shadow: 0 0 0 3px rgba(218, 41, 28, 0.30), var(--shadow-md);
+}
+
+.node-card.highlighted::before,
+.highlighted .node-card::before {
+  height: 6px;
+}
+
+/* Filter dimming — applied to cards that don't match the active filter set.
+   Keeps the hierarchy/layout intact while making matches visually pop. */
+.node-card.filter-dimmed {
+  opacity: 0.22;
+  filter: grayscale(0.5);
+  transition: opacity 0.18s ease, filter 0.18s ease;
+}
+
+.node-card.filter-dimmed:hover {
+  /* Allow the user to inspect a dimmed node by hovering over it. */
+  opacity: 0.6;
+  filter: grayscale(0.2);
+}
+
+/* =========================================================
+   Multiple roots — each top-level node is its own coloured
+   "container" so users can see at a glance which subtree it
+   belongs to. The frame colour comes from --root-color (set
+   inline by the renderer per root).
+   ========================================================= */
+
+.virtual-root {
+  /* Synthetic super-root content — completely invisible. */
+  display: block;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.node-card.is-root {
+  border-width: 2px;
+  /* The inline style on .node-card supplies border-color/background — we
+     just keep the geometry knobs here. */
+}
+
+.node-card.is-root::before {
+  /* Replace the standard red top stripe with the root's own colour. */
+  background: var(--root-color, var(--ft-red));
+  height: 6px;
+}
+
+.node-card.is-root::after {
+  /* Persistent (not hover-only) left rail in the root colour. */
+  width: 4px;
+  background: var(--root-color, var(--ft-red));
+}
+
+.node-card-rootbadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: white;
+  text-transform: uppercase;
+  box-shadow: 0 1px 2px rgba(15, 17, 21, 0.18);
+  pointer-events: none;
+}
+
+/* Push the action buttons left so the ROOT badge stays clear. */
+.node-card.is-root .node-card-actions {
+  right: 64px;
+}
+
+/* =========================================================
+   Expand / collapse pill
+   ========================================================= */
+.expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--ft-black);
+  border: 1px solid var(--ft-black);
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  box-shadow: var(--shadow-sm);
+  letter-spacing: 0.3px;
+  transition: all 0.12s;
+}
+
+.expand-btn:hover {
+  background: var(--ft-red);
+  border-color: var(--ft-red);
+}
+
+.expand-btn span {
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 600;
+}
+
+/* =========================================================
+   Modal
+   ========================================================= */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal[hidden] { display: none; }
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 17, 21, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.modal-dialog {
+  position: relative;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalIn 0.18s ease-out;
+  border-top: 4px solid var(--ft-red);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  color: var(--ft-black);
+}
+
+.modal-close {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  transition: all 0.12s;
+}
+
+.modal-close:hover {
+  background: var(--ft-red);
+  color: white;
+}
+
+.modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  overflow-y: auto;
+  background: white;
+}
+
+.modal-body label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.modal-body label input {
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  font-size: 14px;
+  color: var(--text);
+  background: white;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.modal-body label input:focus {
+  outline: none;
+  border-color: var(--ft-red);
+  box-shadow: 0 0 0 3px rgba(218, 41, 28, 0.18);
+}
+
+/* Country field with flag preview */
+.field-with-flag .field-input-wrap {
+  position: relative;
+  display: block;
+}
+
+.field-with-flag .field-input-wrap input {
+  width: 100%;
+  padding-left: 42px;
+}
+
+/* Higher specificity than `.fi` from flag-icons (which is loaded after this file). */
+.field-with-flag .field-flag,
+.field-with-flag .field-flag.fi {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 16px;
+  border-radius: 2px;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 0 0 1px rgba(15, 17, 21, 0.15);
+  pointer-events: none;
+  display: block;
+}
+
+.field-with-flag .field-flag.field-flag--empty {
+  background:
+    repeating-linear-gradient(45deg, #eef0f2 0 4px, #f8f9fb 4px 8px);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+/* Make room on the right for the clear-button. */
+.field-with-flag .field-input-wrap input { padding-right: 36px; }
+
+/* Clear (×) button shown inside the country field */
+.field-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: none;            /* shown only when there is a value */
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s ease;
+}
+
+.field-clear.is-visible { display: inline-flex; }
+
+.field-clear:hover {
+  background: var(--ft-red);
+  color: white;
+  border-color: var(--ft-red);
+}
+
+.field-clear:focus-visible {
+  outline: 2px solid var(--ft-red);
+  outline-offset: 1px;
+}
+
+/* Department field — text input + colour palette below */
+.field-with-color {
+  /* The label uses flex-direction: column already; nothing else needed here. */
+}
+
+.field-with-color .field-input-wrap {
+  display: block;
+}
+
+.field-with-color .field-input-wrap input[type="text"] {
+  width: 100%;
+}
+
+.color-swatches {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.color-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid white;
+  outline: 1px solid var(--border-strong);
+  outline-offset: 0;
+  border-radius: 50%;
+  background: var(--swatch, #9ca3af);
+  cursor: pointer;
+  transition: transform 0.12s ease, outline-color 0.12s ease, outline-width 0.12s ease;
+}
+
+.color-swatch:hover {
+  transform: scale(1.12);
+  outline-color: var(--ft-charcoal);
+}
+
+.color-swatch.is-active {
+  outline: 2px solid var(--ft-black);
+  outline-offset: 2px;
+  transform: scale(1.12);
+}
+
+.color-swatch:focus-visible {
+  outline: 2px solid var(--ft-red);
+  outline-offset: 2px;
+}
+
+/* Custom-color picker integrates with the swatch row as a final option */
+.field-color-picker {
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  margin-left: auto;          /* push to the right end of the row */
+  border: 1px dashed var(--border-strong);
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.field-color-picker:hover { border-color: var(--ft-graphite); border-style: solid; }
+.field-color-picker:focus { outline: none; border-color: var(--ft-red); box-shadow: 0 0 0 3px rgba(218, 41, 28, 0.18); }
+
+.field-color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+.field-color-picker::-webkit-color-swatch { border: none; border-radius: 50%; }
+.field-color-picker::-moz-color-swatch { border: none; border-radius: 50%; }
+
+.modal-footer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.modal-footer .spacer { flex: 1; }
+
+/* =========================================================
+   Toast
+   ========================================================= */
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ft-black);
+  color: white;
+  padding: 11px 18px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+  animation: toastIn 0.22s ease-out;
+  border-left: 3px solid var(--ft-red);
+}
+
+.toast[hidden] { display: none; }
+.toast.error {
+  border-left-color: #FFB400;
+  background: var(--danger);
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+@media (max-width: 1180px) {
+  .toolbar { gap: 10px; padding: 0 14px; }
+  .btn { padding: 0 10px; font-size: 12px; }
+  .toolbar::before { font-size: 12px; letter-spacing: 1.8px; padding-right: 12px; }
+}
+
+@media (max-width: 980px) {
+  .toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 10px 14px;
+    gap: 8px;
+  }
+  .toolbar::before { display: none; }
+  .toolbar::after { display: none; }
+  .toolbar-search { order: 99; flex-basis: 100%; }
+  .toolbar-search input { max-width: none; }
+}

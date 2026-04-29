@@ -1,0 +1,22 @@
+{
+  "name": "org-chart",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "d3": "^7.9.0",
+    "d3-flextree": "2.1.2",
+    "d3-org-chart": "^3.1.1",
+    "flag-icons": "^7.5.0",
+    "html-to-image": "^1.11.13",
+    "jspdf": "^2.5.2",
+    "papaparse": "^5.4.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}

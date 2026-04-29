@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Org-Chart Builder</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <div class="toolbar-group">
+        <button id="btn-add-root" class="btn btn-primary" title="Neuen Wurzelknoten hinzufügen">+ Wurzelknoten</button>
+        <button id="btn-fit" class="btn" title="Diagramm zentrieren">Zentrieren</button>
+        <button id="btn-expand-all" class="btn" title="Alle ausklappen">Alle aufklappen</button>
+        <button id="btn-collapse-all" class="btn" title="Alle einklappen">Alle einklappen</button>
+      </div>
+
+      <div class="toolbar-group toolbar-search">
+        <input id="search-input" type="search" placeholder="🔍 Suche nach Name, Titel, Abteilung…" />
+      </div>
+
+      <div class="toolbar-group">
+        <button id="btn-import-json" class="btn" title="Org-Chart aus JSON-Datei laden">JSON ⬆</button>
+        <button id="btn-export-json" class="btn" title="Org-Chart als JSON-Datei speichern">JSON ⬇</button>
+        <button id="btn-import-csv" class="btn" title="Mitarbeiter aus CSV importieren">CSV ⬆</button>
+        <button id="btn-export-png" class="btn" title="Als PNG exportieren">PNG</button>
+        <button id="btn-export-svg" class="btn" title="Als SVG exportieren">SVG</button>
+        <button id="btn-export-pdf" class="btn" title="Als PDF exportieren">PDF</button>
+      </div>
+
+      <input id="file-input-json" type="file" accept="application/json,.json" hidden />
+      <input id="file-input-csv" type="file" accept="text/csv,.csv" hidden />
+    </header>
+
+    <!-- Sub-toolbar: filter dropdowns -->
+    <section class="filterbar" aria-label="Filter">
+      <span class="filterbar-label">Filter</span>
+      <label class="filter-field">
+        <span class="filter-field-label">Abteilung</span>
+        <select id="filter-department" class="filter-select">
+          <option value="">Alle Abteilungen</option>
+        </select>
+      </label>
+      <label class="filter-field">
+        <span class="filter-field-label">Land</span>
+        <select id="filter-country" class="filter-select">
+          <option value="">Alle Länder</option>
+        </select>
+      </label>
+      <label class="filter-field" id="filter-root-wrap">
+        <span class="filter-field-label">Wurzel</span>
+        <select id="filter-root" class="filter-select">
+          <option value="">Alle Wurzeln</option>
+        </select>
+      </label>
+      <span id="filter-summary" class="filter-summary" aria-live="polite"></span>
+      <button type="button" id="filter-reset" class="btn btn-ghost">Filter zurücksetzen</button>
+    </section>
+
+    <main id="chart" class="chart"></main>
+
+    <!-- Modal für Add/Edit -->
+    <div id="modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-dialog">
+        <header class="modal-header">
+          <h2 id="modal-title">Knoten bearbeiten</h2>
+          <button class="modal-close" data-close aria-label="Schließen">×</button>
+        </header>
+        <form id="node-form" class="modal-body">
+          <input type="hidden" name="id" />
+          <input type="hidden" name="parentId" />
+
+          <label>
+            <span>Name *</span>
+            <input name="name" type="text" required autocomplete="off" />
+          </label>
+          <label>
+            <span>Titel / Position</span>
+            <input name="title" type="text" autocomplete="off" />
+          </label>
+          <label class="field-with-color">
+            <span>Abteilung</span>
+            <span class="field-input-wrap">
+              <input
+                name="department"
+                type="text"
+                list="department-list"
+                placeholder="z. B. Technik (oder neue Abteilung anlegen)"
+                autocomplete="off"
+              />
+            </span>
+            <div class="color-swatches" role="radiogroup" aria-label="Abteilungs-Farbe">
+              <button type="button" class="color-swatch" data-color="#dc2626" style="--swatch:#dc2626" title="Rot" aria-label="Rot"></button>
+              <button type="button" class="color-swatch" data-color="#ea580c" style="--swatch:#ea580c" title="Orange" aria-label="Orange"></button>
+              <button type="button" class="color-swatch" data-color="#d97706" style="--swatch:#d97706" title="Amber" aria-label="Amber"></button>
+              <button type="button" class="color-swatch" data-color="#65a30d" style="--swatch:#65a30d" title="Limette" aria-label="Limette"></button>
+              <button type="button" class="color-swatch" data-color="#16a34a" style="--swatch:#16a34a" title="Grün" aria-label="Grün"></button>
+              <button type="button" class="color-swatch" data-color="#0d9488" style="--swatch:#0d9488" title="Teal" aria-label="Teal"></button>
+              <button type="button" class="color-swatch" data-color="#0891b2" style="--swatch:#0891b2" title="Cyan" aria-label="Cyan"></button>
+              <button type="button" class="color-swatch" data-color="#2563eb" style="--swatch:#2563eb" title="Blau" aria-label="Blau"></button>
+              <button type="button" class="color-swatch" data-color="#7c3aed" style="--swatch:#7c3aed" title="Violett" aria-label="Violett"></button>
+              <button type="button" class="color-swatch" data-color="#db2777" style="--swatch:#db2777" title="Pink" aria-label="Pink"></button>
+              <button type="button" class="color-swatch" data-color="#475569" style="--swatch:#475569" title="Schiefer" aria-label="Schiefer"></button>
+              <input
+                type="color"
+                name="departmentColor"
+                class="field-color-picker"
+                title="Eigene Farbe"
+                aria-label="Eigene Farbe"
+                value="#9ca3af"
+              />
+            </div>
+          </label>
+          <datalist id="department-list"></datalist>
+          <label>
+            <span>E-Mail</span>
+            <input name="email" type="email" autocomplete="off" />
+          </label>
+          <label>
+            <span>Telefon</span>
+            <input name="phone" type="tel" placeholder="z. B. +49 89 1234567" autocomplete="off" />
+          </label>
+          <label>
+            <span>Bild-URL</span>
+            <input name="imageUrl" type="url" placeholder="https://…" autocomplete="off" />
+          </label>
+          <label class="field-with-flag">
+            <span>Land</span>
+            <span class="field-input-wrap">
+              <span class="field-flag" id="country-flag-preview" aria-hidden="true"></span>
+              <input
+                name="country"
+                type="text"
+                list="country-list"
+                placeholder="z. B. Deutschland oder DE"
+                autocomplete="off"
+              />
+              <button
+                type="button"
+                class="field-clear"
+                id="country-clear"
+                aria-label="Land entfernen"
+                title="Land entfernen"
+              >×</button>
+            </span>
+          </label>
+          <datalist id="country-list"></datalist>
+
+          <footer class="modal-footer">
+            <button type="button" id="btn-delete" class="btn btn-danger" hidden>Löschen</button>
+            <span class="spacer"></span>
+            <button type="button" class="btn" data-close>Abbrechen</button>
+            <button type="submit" class="btn btn-primary">Speichern</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
