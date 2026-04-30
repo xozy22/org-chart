@@ -1,8 +1,8 @@
 # Org-Chart Builder
 
-A browser-based organisational chart builder. Vanilla JS + [d3-org-chart](https://github.com/bumbeishvili/org-chart), served from a tiny nginx container.
+[![Build & Publish Container](https://github.com/xozy22/org-chart/actions/workflows/docker.yml/badge.svg)](https://github.com/xozy22/org-chart/actions/workflows/docker.yml)
 
-> **CI status badge** is added once the workflow file lands on `main` — see *[Activate the GitHub Actions workflow](#activate-the-github-actions-workflow)* below.
+A browser-based organisational chart builder. Vanilla JS + [d3-org-chart](https://github.com/bumbeishvili/org-chart), served from a tiny nginx container.
 
 ![Org-Chart Builder screenshot](docs/screenshot-app.png)
 
@@ -68,35 +68,13 @@ The CI publishes both `linux/amd64` and `linux/arm64`, so the image runs unmodif
 
 ---
 
-## Activate the GitHub Actions workflow
+## Make the published image public
 
-The workflow file lives at `.github/workflows/docker.yml` in the working
-tree but isn't yet committed to `main`. GitHub rejects pushes that touch
-files under `.github/workflows/*` unless the OAuth token used to push has
-the `workflow` scope; the default `gh` token has only `repo / read:org /
-gist`. To enable CI, run these once in a terminal:
-
-```bash
-# Adds the workflow scope to your gh credentials (one-time browser flow).
-gh auth refresh -h github.com -s workflow
-
-# Commit and push the workflow file.
-git add .github/workflows/docker.yml
-git commit -m "ci: add Docker build and publish workflow"
-git push
-```
-
-After the first run finishes, re-add the status badge to the top of
-this README:
-
-```md
-[![Build & Publish Container](https://github.com/xozy22/org-chart/actions/workflows/docker.yml/badge.svg)](https://github.com/xozy22/org-chart/actions/workflows/docker.yml)
-```
-
-GHCR packages start out **private**. To allow `docker pull` without a
-login, open <https://github.com/xozy22?tab=packages>, select the
-`org-chart` package, then *Package settings → Change visibility →
-Public* (one-time).
+GHCR packages start out **private**. To allow `docker pull
+ghcr.io/xozy22/org-chart:latest` without a login, open
+<https://github.com/xozy22?tab=packages>, select the `org-chart`
+package, then *Package settings → Change visibility → Public*. This is
+a one-time step that survives subsequent CI runs.
 
 ## Continuous integration
 
