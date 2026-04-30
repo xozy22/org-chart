@@ -8,6 +8,48 @@ export const store = {
   /** Map of explicit department → hex color overrides. Falls back to a stable hash. */
   departments: {},
 
+  /** Subscribers notified on every mutation that changes persistent state.
+   *  Used by the history module to record snapshots for undo/redo. */
+  _listeners: [],
+  onChange(fn) {
+    this._listeners.push(fn);
+    return () => {
+      this._listeners = this._listeners.filter((l) => l !== fn);
+    };
+  },
+  _emit() {
+    for (const fn of this._listeners) {
+      try {
+        fn(this.snapshot());
+      } catch (err) {
+        console.error('store listener failed', err);
+      }
+    }
+  },
+
+  /** Deep-cloned snapshot of the persistent state. */
+  snapshot() {
+    return {
+      nodes: JSON.parse(JSON.stringify(this.nodes)),
+      departments: JSON.parse(JSON.stringify(this.departments)),
+    };
+  },
+
+  /** Replace state from a snapshot WITHOUT firing change listeners.
+   *  Persists to localStorage so a reload picks up the restored state.
+   *  Used by undo/redo so applying a history entry doesn't push a new one. */
+  restore(snap) {
+    if (!snap) return;
+    this.nodes = JSON.parse(JSON.stringify(snap.nodes || []));
+    this.departments = JSON.parse(JSON.stringify(snap.departments || {}));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.nodes));
+      localStorage.setItem(DEPT_KEY, JSON.stringify(this.departments));
+    } catch (err) {
+      console.warn('localStorage persist failed', err);
+    }
+  },
+
   load() {
     let nodes = null;
     try {
@@ -43,6 +85,9 @@ export const store = {
     } catch (err) {
       console.warn('localStorage persist failed', err);
     }
+    // Notify subscribers AFTER persistence so anyone listening can
+    // rely on localStorage being up to date (e.g. history snapshots).
+    this._emit();
   },
 
   set(nodes) {

@@ -5,10 +5,12 @@ import { setupModal } from './crud.js';
 import { exportJson, importJson, importCsv } from './io.js';
 import { setupFilters } from './filters.js';
 import { exportPng, exportSvg, exportPdf } from './exporter.js';
+import { createHistory } from './history.js';
 
 let chart = null;
 let modal = null;
 let filtersRef = null;
+let history = null;
 
 function toast(message, kind = 'info', ms = 2400) {
   const el = document.getElementById('toast');
@@ -58,6 +60,12 @@ function bindToolbar() {
   document.getElementById('btn-fit').addEventListener('click', () => chart.fit());
   document.getElementById('btn-expand-all').addEventListener('click', () => chart.expandAll().fit());
   document.getElementById('btn-collapse-all').addEventListener('click', () => collapseAllSubtrees(chart));
+
+  // Undo / Redo
+  const undoBtn = document.getElementById('btn-undo');
+  const redoBtn = document.getElementById('btn-redo');
+  undoBtn.addEventListener('click', () => doUndo());
+  redoBtn.addEventListener('click', () => doRedo());
 
   // JSON
   const jsonInput = document.getElementById('file-input-json');
@@ -144,6 +152,56 @@ function bindNodeActionDelegation() {
   });
 }
 
+function syncHistoryButtons(status) {
+  const undoBtn = document.getElementById('btn-undo');
+  const redoBtn = document.getElementById('btn-redo');
+  if (undoBtn) undoBtn.disabled = !status.canUndo;
+  if (redoBtn) redoBtn.disabled = !status.canRedo;
+}
+
+function doUndo() {
+  const snap = history.undo();
+  if (!snap) {
+    toast('Keine weiteren Schritte zum Rückgängig-Machen', 'info', 1800);
+    return;
+  }
+  rerender();
+  toast('Rückgängig gemacht', 'info', 1500);
+}
+
+function doRedo() {
+  const snap = history.redo();
+  if (!snap) {
+    toast('Nichts zum Wiederholen', 'info', 1800);
+    return;
+  }
+  rerender();
+  toast('Wiederhergestellt', 'info', 1500);
+}
+
+function bindKeyboardShortcuts() {
+  document.addEventListener('keydown', (ev) => {
+    // Ignore when the user is typing in a form field
+    const t = ev.target;
+    if (t instanceof HTMLElement) {
+      const tag = t.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable) {
+        return;
+      }
+    }
+    const ctrl = ev.ctrlKey || ev.metaKey;
+    if (!ctrl) return;
+    const key = ev.key.toLowerCase();
+    if (key === 'z' && !ev.shiftKey) {
+      ev.preventDefault();
+      doUndo();
+    } else if ((key === 'z' && ev.shiftKey) || key === 'y') {
+      ev.preventDefault();
+      doRedo();
+    }
+  });
+}
+
 async function bootstrap() {
   const initialData = await loadInitialData();
 
@@ -158,8 +216,16 @@ async function bootstrap() {
     onChange: () => rerender(),
   });
 
+  // History — must be created AFTER the initial data is loaded so the
+  // first snapshot reflects the initial state. Subsequent store mutations
+  // automatically push new entries via the onChange subscription.
+  history = createHistory(store, { onChange: syncHistoryButtons });
+  history.reset(store.snapshot());
+  syncHistoryButtons(history.getStatus());
+
   bindToolbar();
   bindNodeActionDelegation();
+  bindKeyboardShortcuts();
 
   // Filter bar — keeps its dropdowns in sync with the live store after every
   // data mutation so freshly added departments / countries / roots show up.
