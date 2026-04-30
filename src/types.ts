@@ -1,0 +1,73 @@
+/**
+ * Central type definitions used across the org-chart codebase.
+ *
+ * Keep this file dependency-free: every other module pulls types from
+ * here, so circular imports would be painful.
+ */
+
+export type NodeId = string;
+
+/** ISO 3166-1 alpha-2 country code, lowercase (e.g. `de`, `us`). */
+export type CountryCode = string;
+
+/** Single user-defined custom field schema entry. */
+export interface CustomField {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'url' | 'email';
+  showOnCard: boolean;
+}
+
+/**
+ * A single org-chart node. Built-in fields are typed; user-defined custom
+ * field values land directly on the same object via `[customKey]: unknown`.
+ */
+export interface OrgNode {
+  id: NodeId;
+  parentId: NodeId | null;
+  name: string;
+  title?: string;
+  department?: string;
+  email?: string;
+  phone?: string;
+  imageUrl?: string;
+  /** ISO-2 lowercase country code, or `''` when unset. */
+  country?: CountryCode | '';
+
+  // Internal markers added by withVirtualRoot — not persisted.
+  _virtual?: boolean;
+  _isRoot?: boolean;
+  _rootColor?: string;
+
+  // Any additional keys are user-defined custom-field values.
+  [key: string]: unknown;
+}
+
+/** Persistent snapshot used by the undo/redo history. */
+export interface Snapshot {
+  nodes: OrgNode[];
+  departments: Record<string, string>;
+  customFields?: CustomField[];
+}
+
+/** Result of the filter+search apply step. */
+export interface FilterValues {
+  query: string;
+  department: string;
+  country: string;
+  rootId: string;
+  rootDescendants?: Set<string> | null;
+}
+
+/** Result of `computeStats` in stats.ts. */
+export interface ChartStats {
+  total: number;
+  roots: { id: NodeId; name: string; count: number; maxDepth: number }[];
+  departments: { name: string; count: number }[];
+  countries: { code: CountryCode; count: number }[];
+  withEmail: number;
+  withPhone: number;
+  withCountry: number;
+  maxDepth: number;
+  avgDepth: number;
+}

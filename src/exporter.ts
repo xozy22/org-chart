@@ -44,13 +44,13 @@ function downloadHref(href, filename) {
 /*  CSS gathering                                                       */
 /* -------------------------------------------------------------------- */
 
-const cssCache = { text: null };
+const cssCache: { text: string | null } = { text: null };
 
-function collectDocumentCss() {
+function collectDocumentCss(): string {
   if (cssCache.text != null) return cssCache.text;
   let css = '';
   for (const sheet of Array.from(document.styleSheets)) {
-    let rules;
+    let rules: CSSRuleList | null = null;
     try {
       rules = sheet.cssRules;
     } catch {
@@ -60,7 +60,7 @@ function collectDocumentCss() {
     }
     if (!rules) continue;
     for (const rule of Array.from(rules)) {
-      css += rule.cssText + '\n';
+      css += (rule as CSSRule).cssText + '\n';
     }
   }
   cssCache.text = css;
@@ -94,9 +94,9 @@ async function fetchAsDataUrl(url) {
  * element's computed style — the live element still has the working
  * stylesheet attached, the clone does not yet have anything but markup.
  */
-async function inlineFlagBackgrounds(liveSvg, clonedSvg) {
-  const liveFlags = Array.from(liveSvg.querySelectorAll('.fi'));
-  const cloneFlags = Array.from(clonedSvg.querySelectorAll('.fi'));
+async function inlineFlagBackgrounds(liveSvg: SVGElement, clonedSvg: SVGElement) {
+  const liveFlags = Array.from(liveSvg.querySelectorAll<HTMLElement>('.fi'));
+  const cloneFlags = Array.from(clonedSvg.querySelectorAll<HTMLElement>('.fi'));
   await Promise.all(
     liveFlags.map(async (live, i) => {
       const clone = cloneFlags[i];
@@ -199,17 +199,17 @@ function loadImage(src) {
   });
 }
 
-async function rasterToPng(svgEl, width, height) {
+async function rasterToPng(svgEl: SVGElement, width: number, height: number): Promise<string> {
   const xml = serializeSvg(svgEl);
   const dataUrl = svgStringToDataUrl(xml);
   const img = await loadImage(dataUrl);
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(width * PIXEL_RATIO);
   canvas.height = Math.round(height * PIXEL_RATIO);
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img as HTMLImageElement, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL('image/png');
 }
 

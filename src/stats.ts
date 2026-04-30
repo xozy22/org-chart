@@ -6,7 +6,9 @@
  * is `0` for a real root, `1` for its direct children, and so on.
  */
 
-function depthsByNode(nodes) {
+import type { OrgNode, ChartStats } from './types.js';
+
+function depthsByNode(nodes: OrgNode[]): Map<string, number> {
   const idToNode = new Map(nodes.map((n) => [String(n.id), n]));
   const depth = new Map();
   function compute(id, seen = new Set()) {
@@ -39,7 +41,7 @@ function descendantsOf(rootId, nodes) {
   return ids;
 }
 
-export function computeStats(nodes) {
+export function computeStats(nodes: OrgNode[]): ChartStats {
   const total = nodes.length;
   if (total === 0) {
     return {

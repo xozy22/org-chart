@@ -92,7 +92,7 @@ function hexAlpha(hex, alpha) {
  *
  * Returns the original list unchanged when there is at most one root.
  */
-export function withVirtualRoot(nodes) {
+export function withVirtualRoot(nodes: any[]): any[] {
   const roots = nodes.filter((n) => n.parentId == null || n.parentId === '');
   if (roots.length <= 1) {
     // No virtual root needed → no per-subtree colour, default red accents apply.
@@ -260,7 +260,11 @@ function renderNodeCard(d) {
   `;
 }
 
-export function createChart(container, rawData, handlers = {}) {
+export function createChart(
+  container: HTMLElement,
+  rawData: any[],
+  handlers: { onNodeClick?: (id: string) => void } = {},
+) {
   const data = withVirtualRoot(rawData);
   const chart = new OrgChart()
     .container(container)

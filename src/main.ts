@@ -18,13 +18,13 @@ let filtersRef = null;
 let history = null;
 let selection = null;
 
-function toast(message, kind = 'info', ms = 2400) {
-  const el = document.getElementById('toast');
+function toast(message: string, kind: 'info' | 'error' = 'info', ms = 2400) {
+  const el = document.getElementById('toast') as HTMLElement;
   el.textContent = message;
   el.className = 'toast' + (kind === 'error' ? ' error' : '');
   el.hidden = false;
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => {
+  clearTimeout((toast as any)._t);
+  (toast as any)._t = setTimeout(() => {
     el.hidden = true;
   }, ms);
 }
@@ -74,7 +74,7 @@ function bindToolbar() {
   redoBtn.addEventListener('click', () => doRedo());
 
   // JSON
-  const jsonInput = document.getElementById('file-input-json');
+  const jsonInput = document.getElementById('file-input-json') as HTMLInputElement;
   document.getElementById('btn-import-json').addEventListener('click', () => jsonInput.click());
   jsonInput.addEventListener('change', async () => {
     const file = jsonInput.files?.[0];
@@ -87,8 +87,8 @@ function bindToolbar() {
       store.save();
       rerender();
       toast(`${nodes.length} Knoten importiert`);
-    } catch (err) {
-      toast('Import fehlgeschlagen: ' + err.message, 'error', 4000);
+    } catch (err: any) {
+      toast('Import fehlgeschlagen: ' + (err?.message ?? err), 'error', 4000);
     } finally {
       jsonInput.value = '';
     }
@@ -99,7 +99,7 @@ function bindToolbar() {
   });
 
   // CSV
-  const csvInput = document.getElementById('file-input-csv');
+  const csvInput = document.getElementById('file-input-csv') as HTMLInputElement;
   document.getElementById('btn-import-csv').addEventListener('click', () => csvInput.click());
   csvInput.addEventListener('change', async () => {
     const file = csvInput.files?.[0];
@@ -109,22 +109,22 @@ function bindToolbar() {
       store.set(nodes);
       rerender();
       toast(`${nodes.length} Zeilen importiert`);
-    } catch (err) {
-      toast('CSV-Import fehlgeschlagen: ' + err.message, 'error', 4500);
+    } catch (err: any) {
+      toast('CSV-Import fehlgeschlagen: ' + (err?.message ?? err), 'error', 4500);
     } finally {
       csvInput.value = '';
     }
   });
 
   // Export images — wraps the async pipeline so we can show progress and errors.
-  async function runExport(label, fn) {
+  async function runExport(label: string, fn: (c: any) => Promise<void> | void) {
     toast(`${label} wird vorbereitet…`, 'info', 8000);
     try {
       await fn(chart);
       toast(`${label} heruntergeladen`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast(`${label}-Export fehlgeschlagen: ${err.message}`, 'error', 5000);
+      toast(`${label}-Export fehlgeschlagen: ${err?.message ?? err}`, 'error', 5000);
     }
   }
   document.getElementById('btn-export-png').addEventListener('click', () => runExport('PNG', exportPng));
@@ -178,9 +178,9 @@ function bindNodeActionDelegation() {
   });
 }
 
-function syncHistoryButtons(status) {
-  const undoBtn = document.getElementById('btn-undo');
-  const redoBtn = document.getElementById('btn-redo');
+function syncHistoryButtons(status: { canUndo: boolean; canRedo: boolean }) {
+  const undoBtn = document.getElementById('btn-undo') as HTMLButtonElement | null;
+  const redoBtn = document.getElementById('btn-redo') as HTMLButtonElement | null;
   if (undoBtn) undoBtn.disabled = !status.canUndo;
   if (redoBtn) redoBtn.disabled = !status.canRedo;
 }
@@ -209,14 +209,14 @@ function doRedo() {
 /*  Bulk action bar — appears when ≥ 1 card is multi-selected           */
 /* -------------------------------------------------------------------- */
 function refreshBulkDropdowns() {
-  const deptSel = document.getElementById('bulk-department');
-  const countrySel = document.getElementById('bulk-country');
+  const deptSel = document.getElementById('bulk-department') as HTMLSelectElement;
+  const countrySel = document.getElementById('bulk-country') as HTMLSelectElement;
   // Department options pulled from the live store
   const depts = store.listDepartments();
   deptSel.innerHTML =
     '<option value="">Abteilung wählen…</option>' +
     '<option value="__clear__">— Abteilung leeren —</option>' +
-    depts.map((d) => `<option value="${d.replace(/"/g, '&quot;')}">${d}</option>`).join('');
+    depts.map((d) => `<option value="${(d as string).replace(/"/g, '&quot;')}">${d}</option>`).join('');
   // Country options — full ISO list since you might want to assign a new one
   countrySel.innerHTML =
     '<option value="">Land wählen…</option>' +
@@ -235,15 +235,15 @@ function syncBulkBar({ size, ids }) {
   count.textContent = `${size} ausgewählt`;
   refreshBulkDropdowns();
   // Reset the dropdowns to the placeholder each time selection changes
-  document.getElementById('bulk-department').value = '';
-  document.getElementById('bulk-country').value = '';
+  (document.getElementById('bulk-department') as HTMLSelectElement).value = '';
+  (document.getElementById('bulk-country') as HTMLSelectElement).value = '';
 }
 
 function bindBulkBar() {
-  const deleteBtn = document.getElementById('bulk-delete');
-  const clearBtn = document.getElementById('bulk-clear');
-  const deptSel = document.getElementById('bulk-department');
-  const countrySel = document.getElementById('bulk-country');
+  const deleteBtn = document.getElementById('bulk-delete') as HTMLButtonElement;
+  const clearBtn = document.getElementById('bulk-clear') as HTMLButtonElement;
+  const deptSel = document.getElementById('bulk-department') as HTMLSelectElement;
+  const countrySel = document.getElementById('bulk-country') as HTMLSelectElement;
 
   deleteBtn.addEventListener('click', () => {
     const ids = selection.getAll();

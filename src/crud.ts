@@ -3,12 +3,12 @@ import { defaultDepartmentColor } from './departments.js';
 
 const FIELDS = ['id', 'parentId', 'name', 'title', 'department', 'email', 'phone', 'imageUrl', 'country'];
 
-function $(sel, root = document) {
-  return root.querySelector(sel);
+function $<T extends Element = Element>(sel: string, root: ParentNode = document): T | null {
+  return root.querySelector<T>(sel);
 }
 
 function populateCountryDatalist() {
-  const list = $('#country-list');
+  const list = $<HTMLElement>('#country-list');
   if (!list || list.dataset.populated) return;
   list.innerHTML = COUNTRIES
     .map((c) => `<option value="${c.name}" data-code="${c.code}">${c.code.toUpperCase()} — ${c.name}</option>`)
@@ -16,7 +16,7 @@ function populateCountryDatalist() {
   list.dataset.populated = '1';
 }
 
-function populateDepartmentDatalist(store) {
+function populateDepartmentDatalist(store: any) {
   const list = $('#department-list');
   if (!list) return;
   const items = store.listDepartments();
@@ -60,16 +60,16 @@ function renderCustomFields(store) {
     .join('');
 }
 
-export function setupModal({ store, onChange }) {
-  const modal = $('#modal');
-  const form = $('#node-form');
-  const titleEl = $('#modal-title');
-  const deleteBtn = $('#btn-delete');
-  const countryFlag = $('#country-flag-preview');
-  const countryInput = form.elements.namedItem('country');
-  const countryClearBtn = $('#country-clear');
-  const deptInput = form.elements.namedItem('department');
-  const deptColorInput = form.elements.namedItem('departmentColor');
+export function setupModal({ store, onChange }: { store: any; onChange?: () => void }) {
+  const modal = $<HTMLElement>('#modal')!;
+  const form = $<HTMLFormElement>('#node-form')!;
+  const titleEl = $<HTMLElement>('#modal-title')!;
+  const deleteBtn = $<HTMLButtonElement>('#btn-delete')!;
+  const countryFlag = $<HTMLElement>('#country-flag-preview');
+  const countryInput = form.elements.namedItem('country') as HTMLInputElement | null;
+  const countryClearBtn = $<HTMLButtonElement>('#country-clear');
+  const deptInput = form.elements.namedItem('department') as HTMLInputElement | null;
+  const deptColorInput = form.elements.namedItem('departmentColor') as HTMLInputElement | null;
 
   populateCountryDatalist();
 
@@ -105,7 +105,7 @@ export function setupModal({ store, onChange }) {
     countryInput.focus();
   });
 
-  const swatches = Array.from(form.querySelectorAll('.color-swatch'));
+  const swatches = Array.from(form.querySelectorAll<HTMLButtonElement>('.color-swatch'));
 
   function markActiveSwatch(hex) {
     const target = (hex || '').toLowerCase();
@@ -155,7 +155,7 @@ export function setupModal({ store, onChange }) {
 
   function openModal() {
     modal.hidden = false;
-    setTimeout(() => form.querySelector('input[name="name"]').focus(), 30);
+    setTimeout(() => form.querySelector<HTMLInputElement>('input[name="name"]')?.focus(), 30);
   }
 
   function closeModal() {
@@ -164,9 +164,9 @@ export function setupModal({ store, onChange }) {
     currentId = null;
   }
 
-  function fillForm(node) {
+  function fillForm(node: any) {
     FIELDS.forEach((key) => {
-      const input = form.elements.namedItem(key);
+      const input = form.elements.namedItem(key) as HTMLInputElement | null;
       if (!input) return;
       if (key === 'country') {
         // Show the localized country name in the input; the underlying value stays the ISO code via resolve.
@@ -187,10 +187,10 @@ export function setupModal({ store, onChange }) {
     syncDeptColor();
   }
 
-  function readForm() {
-    const data = {};
+  function readForm(): Record<string, any> {
+    const data: Record<string, any> = {};
     FIELDS.forEach((key) => {
-      const input = form.elements.namedItem(key);
+      const input = form.elements.namedItem(key) as HTMLInputElement | null;
       const v = input?.value?.trim() ?? '';
       if (key === 'country') {
         data.country = countryCode(v) ?? '';
@@ -199,7 +199,7 @@ export function setupModal({ store, onChange }) {
       }
     });
     // Custom fields — pass-through, empty strings stored as ''
-    const custom = {};
+    const custom: Record<string, string> = {};
     for (const cf of store.customFields || []) {
       const input = form.elements.namedItem(cf.key);
       if (input instanceof HTMLInputElement) {

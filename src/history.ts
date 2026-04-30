@@ -19,13 +19,24 @@
 
 const MAX_HISTORY = 50;
 
-function deepClone(obj) {
+import type { Snapshot } from './types.js';
+
+interface HistoryStatus {
+  canUndo: boolean;
+  canRedo: boolean;
+  size: number;
+  cursor: number;
+}
+
+function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
-export function createHistory(store, { onChange } = {}) {
-  /** @type {{nodes: any[], departments: object}[]} */
-  let stack = [];
+export function createHistory(
+  store: any,
+  { onChange }: { onChange?: (s: HistoryStatus) => void } = {},
+) {
+  let stack: Snapshot[] = [];
   let cursor = -1;
   /** Set to true while we are restoring so the listener ignores the
    *  resulting save() — but we use `restore()` which doesn't emit, so

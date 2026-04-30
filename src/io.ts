@@ -23,7 +23,7 @@ export function exportJson(nodes, departments = {}, customFields = []) {
   downloadBlob(blob, `org-chart-${ts}.json`);
 }
 
-function readFileAsText(file) {
+function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ''));
@@ -72,9 +72,9 @@ function flattenTree(tree) {
   return out;
 }
 
-export async function importJson(file) {
+export async function importJson(file: File) {
   const text = await readFileAsText(file);
-  const parsed = JSON.parse(text);
+  const parsed: any = JSON.parse(text);
   // v2/v3 object format: { nodes, departments, customFields? }
   if (parsed && typeof parsed === 'object' && Array.isArray(parsed.nodes)) {
     return {
@@ -104,7 +104,7 @@ export async function importJson(file) {
  * keys. Any column we don't know about is still preserved by `normalize`,
  * so importing a CSV produced by a peer with extra columns just works.
  */
-export function importCsv(file, customFields = []) {
+export function importCsv(file: File, customFields: any[] = []): Promise<any> {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: true,
@@ -113,8 +113,8 @@ export function importCsv(file, customFields = []) {
         try {
           const customKeys = customFields.map((f) => f.key);
           const allFields = [...BUILTIN_FIELDS, ...customKeys];
-          const rows = result.data.map((row) => {
-            const obj = {};
+          const rows = (result.data as any[]).map((row) => {
+            const obj: Record<string, any> = {};
             allFields.forEach((k) => {
               if (k in row) obj[k] = row[k];
             });

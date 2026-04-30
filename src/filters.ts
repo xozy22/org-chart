@@ -121,8 +121,9 @@ export function setupFilters({ chart, store }) {
     if (depts.includes(prevDept)) deptSelect.value = prevDept;
 
     // Countries — only ones in use
-    const countriesInUse = [...new Set(store.get().map((n) => (n.country || '').toLowerCase()).filter(Boolean))]
-      .sort((a, b) => countryName(a).localeCompare(countryName(b), 'de'));
+    const countriesInUse: string[] = ([
+      ...new Set(store.get().map((n: any) => ((n.country as string) || '').toLowerCase()).filter(Boolean)),
+    ] as string[]).sort((a, b) => countryName(a).localeCompare(countryName(b), 'de'));
     const prevCountry = countrySelect.value;
     countrySelect.innerHTML =
       '<option value="">Alle Länder</option>' +

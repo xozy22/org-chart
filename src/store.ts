@@ -1,28 +1,31 @@
 import { defaultDepartmentColor } from './departments.js';
+import type { OrgNode, NodeId, CustomField, Snapshot } from './types.js';
 
 const STORAGE_KEY = 'orgchart.data.v1';
 const DEPT_KEY = 'orgchart.departments.v1';
 const CUSTOM_FIELDS_KEY = 'orgchart.customfields.v1';
 
 /** Built-in node fields that user-defined custom fields must not shadow. */
-const RESERVED_FIELD_KEYS = new Set([
+const RESERVED_FIELD_KEYS: Set<string> = new Set([
   'id', 'parentId', 'name', 'title', 'department', 'email', 'phone',
   'imageUrl', 'country',
   // Internal markers used by the renderer for multi-root subtrees
   '_virtual', '_isRoot', '_rootColor',
 ]);
 
+type Listener = (snap: Snapshot) => void;
+
 export const store = {
-  nodes: [],
+  nodes: [] as OrgNode[],
   /** Map of explicit department → hex color overrides. Falls back to a stable hash. */
-  departments: {},
+  departments: {} as Record<string, string>,
   /** User-defined custom fields. Each entry is `{ key, label, type, showOnCard }`.
    *  Values for these fields are stored directly on each node under the same key. */
-  customFields: [],
+  customFields: [] as CustomField[],
 
   /** Subscribers notified on every mutation that changes persistent state.
    *  Used by the history module to record snapshots for undo/redo. */
-  _listeners: [],
+  _listeners: [] as Listener[],
   onChange(fn) {
     this._listeners.push(fn);
     return () => {
@@ -175,13 +178,13 @@ export const store = {
   listDepartments() {
     const set = new Set();
     for (const n of this.nodes) {
-      const d = (n.department || '').trim();
+      const d = ((n.department as string) || '').trim();
       if (d) set.add(d);
     }
     for (const k of Object.keys(this.departments)) {
       if (k) set.add(k);
     }
-    return [...set].sort((a, b) => a.localeCompare(b, 'de'));
+    return [...set].sort((a, b) => (a as string).localeCompare(b as string, 'de'));
   },
 
   /** Hex color for a department — explicit override or stable hash default. */
