@@ -16,6 +16,7 @@
         <button id="btn-expand-all" class="btn" title="Alle ausklappen">Alle aufklappen</button>
         <button id="btn-collapse-all" class="btn" title="Alle einklappen">Alle einklappen</button>
         <button id="btn-settings" class="btn btn-icon" title="Eigene Felder verwalten" aria-label="Eigene Felder verwalten">⚙</button>
+        <button id="btn-stats" class="btn btn-icon" title="Statistiken anzeigen" aria-label="Statistiken anzeigen">📊</button>
       </div>
 
       <div class="toolbar-group toolbar-search">
@@ -61,6 +62,16 @@
     </section>
 
     <main id="chart" class="chart"></main>
+
+    <!-- Stats / KPI sidebar — slides in from the right when the
+         toolbar's 📊 button is pressed. -->
+    <aside id="stats-sidebar" class="stats-sidebar" hidden aria-label="Statistiken">
+      <header class="stats-header">
+        <h2>Statistiken</h2>
+        <button type="button" id="stats-close" class="stats-close" aria-label="Schließen">×</button>
+      </header>
+      <div id="stats-body" class="stats-body"></div>
+    </aside>
 
     <!-- Minimap pinned to the bottom-right of the canvas. The canvas
          itself is appended by minimap.js. -->

@@ -9,6 +9,7 @@ import { createHistory } from './history.js';
 import { createSelection } from './selection.js';
 import { createMinimap } from './minimap.js';
 import { setupCustomFieldsUI } from './customFields.js';
+import { computeStats } from './stats.js';
 import { COUNTRIES, countryName } from './countries.js';
 
 let chart = null;
@@ -283,6 +284,127 @@ function bindBulkBar() {
   });
 }
 
+/* -------------------------------------------------------------------- */
+/*  Stats sidebar                                                        */
+/* -------------------------------------------------------------------- */
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderBars(items, maxItems = 5) {
+  if (items.length === 0) return '<p class="stats-empty">Noch keine Daten.</p>';
+  const max = Math.max(1, ...items.map((i) => i.count));
+  const top = items.slice(0, maxItems);
+  return top
+    .map((it) => {
+      const w = Math.round((it.count / max) * 100);
+      const flag = it.flag ? `<span class="stats-flag fi fi-${escapeHtml(it.flag)}"></span>` : '';
+      return `
+        <div>
+          <div class="stats-bar">
+            <span class="stats-bar-label">${flag}<span class="stats-bar-name">${escapeHtml(it.label)}</span></span>
+            <span class="stats-bar-count">${it.count}</span>
+          </div>
+          <div class="stats-bar-track"><div class="stats-bar-fill" style="width:${w}%"></div></div>
+        </div>
+      `;
+    })
+    .join('');
+}
+
+function renderStats() {
+  const sidebar = document.getElementById('stats-sidebar');
+  if (!sidebar || sidebar.hidden) return;
+  const body = document.getElementById('stats-body');
+  if (!body) return;
+
+  const s = computeStats(store.get());
+
+  const kpisHtml = `
+    <section class="stats-section">
+      <div class="stats-kpis">
+        <div class="stats-kpi"><div class="stats-kpi-value">${s.total}</div><div class="stats-kpi-label">Knoten gesamt</div></div>
+        <div class="stats-kpi"><div class="stats-kpi-value">${s.roots.length}</div><div class="stats-kpi-label">Wurzelknoten</div></div>
+        <div class="stats-kpi"><div class="stats-kpi-value">${s.departments.length}</div><div class="stats-kpi-label">Abteilungen</div></div>
+        <div class="stats-kpi"><div class="stats-kpi-value">${s.countries.length}</div><div class="stats-kpi-label">Länder</div></div>
+        <div class="stats-kpi"><div class="stats-kpi-value">${s.maxDepth}</div><div class="stats-kpi-label">Max. Tiefe</div></div>
+        <div class="stats-kpi"><div class="stats-kpi-value">${s.avgDepth.toFixed(1)}</div><div class="stats-kpi-label">Ø Tiefe</div></div>
+      </div>
+    </section>
+  `;
+
+  const completenessHtml = s.total === 0 ? '' : `
+    <section class="stats-section">
+      <h3>Vollständigkeit</h3>
+      ${renderBars([
+        { label: 'mit E-Mail', count: s.withEmail },
+        { label: 'mit Telefon', count: s.withPhone },
+        { label: 'mit Land', count: s.withCountry },
+      ], 3)}
+    </section>
+  `;
+
+  const rootsHtml = s.roots.length === 0 ? '' : `
+    <section class="stats-section">
+      <h3>Wurzelknoten</h3>
+      ${renderBars(s.roots.map((r) => ({ label: `${r.name} · Tiefe ${r.maxDepth}`, count: r.count })), 8)}
+    </section>
+  `;
+
+  const deptsHtml = s.departments.length === 0 ? '' : `
+    <section class="stats-section">
+      <h3>Top-Abteilungen</h3>
+      ${renderBars(s.departments.map((d) => ({ label: d.name, count: d.count })), 6)}
+    </section>
+  `;
+
+  const countriesHtml = s.countries.length === 0 ? '' : `
+    <section class="stats-section">
+      <h3>Top-Länder</h3>
+      ${renderBars(
+        s.countries.map((c) => ({
+          label: `${c.code.toUpperCase()} — ${countryName(c.code) || c.code}`,
+          count: c.count,
+          flag: c.code,
+        })),
+        6,
+      )}
+    </section>
+  `;
+
+  body.innerHTML = kpisHtml + completenessHtml + rootsHtml + deptsHtml + countriesHtml;
+}
+
+function setupStatsSidebar() {
+  const sidebar = document.getElementById('stats-sidebar');
+  const openBtn = document.getElementById('btn-stats');
+  const closeBtn = document.getElementById('stats-close');
+  if (!sidebar || !openBtn || !closeBtn) return;
+
+  openBtn.addEventListener('click', () => {
+    sidebar.hidden = false;
+    renderStats();
+  });
+  closeBtn.addEventListener('click', () => {
+    sidebar.hidden = true;
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && !sidebar.hidden) sidebar.hidden = true;
+  });
+
+  // Re-render whenever the store changes — uses the existing onChange API
+  // we wired up for history. Idempotent if the sidebar is hidden.
+  store.onChange(() => {
+    if (!sidebar.hidden) renderStats();
+  });
+}
+
 function bindKeyboardShortcuts() {
   document.addEventListener('keydown', (ev) => {
     // Ignore when the user is typing in a form field
@@ -363,6 +485,9 @@ async function bootstrap() {
     store,
     onChange: () => rerender(),
   });
+
+  // Stats sidebar — opens via the toolbar's 📊 button.
+  setupStatsSidebar();
 
   // Filter bar — keeps its dropdowns in sync with the live store after every
   // data mutation so freshly added departments / countries / roots show up.
