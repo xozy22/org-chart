@@ -1,0 +1,28 @@
+# Minimal docker-compose for running the published Org-Chart Builder image.
+#
+# All chart data lives in the visitor's browser localStorage — the container
+# itself is stateless. The optional volume mount below replaces the demo
+# dataset with your own seed JSON, which fresh browsers (empty localStorage)
+# load on first visit.
+#
+# Usage:
+#   docker compose up -d
+#   open http://localhost:8080
+
+services:
+  org-chart:
+    image: ghcr.io/xozy22/org-chart:latest
+    container_name: org-chart
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    # OPTIONAL: bring your own initial chart. Either the bare-array
+    # legacy format or the v2 object form is accepted. Comment out
+    # to keep the bundled demo data.
+    # volumes:
+    #   - ./my-chart.json:/usr/share/nginx/html/sample-data.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/", "-O", "/dev/null"]
+      interval: 30s
+      timeout: 3s
+      retries: 3

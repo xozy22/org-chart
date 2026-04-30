@@ -68,6 +68,73 @@ The CI publishes both `linux/amd64` and `linux/arm64`, so the image runs unmodif
 
 ---
 
+## Where is the chart stored?
+
+**Inside the user's browser, not the container.** The container is fully
+stateless — it only serves static files. Every chart edit is persisted
+to the browser's `localStorage` under two keys:
+
+| Key | Contents |
+|---|---|
+| `orgchart.data.v1` | The flat array of nodes |
+| `orgchart.departments.v1` | The map of explicit department colours |
+
+This means:
+
+- **Restarting the container does nothing to your data** — your browser
+  still has it. You can pull a brand-new image, recreate the container,
+  even bind-mount a different folder, and your chart is intact.
+- **Different browsers / users see different charts.** `localStorage` is
+  scoped to *origin × profile*. There is no shared backend.
+- **`Ctrl-Shift-Del` / clearing site data wipes the chart.** Use the
+  toolbar's `JSON ⬇` button to take a backup, and `JSON ⬆` (or `CSV ⬆`)
+  to restore.
+
+If you need a multi-user, server-side store, you'll have to add a
+backend — that's intentionally out of scope for this image.
+
+### Provide a default chart at container startup
+
+The static file `sample-data.json` ships inside the image and is loaded
+the *first time* a browser opens the app (when `localStorage` is empty).
+Mount your own JSON over it to pre-populate every fresh visitor:
+
+```bash
+docker run --rm -p 8080:80 \
+  -v "$PWD/my-chart.json:/usr/share/nginx/html/sample-data.json:ro" \
+  ghcr.io/xozy22/org-chart:latest
+```
+
+The file must follow the format documented under
+[*Data format*](#data-format). Either the bare-array form or the v2
+object form (`{ nodes, departments }`) works.
+
+> Existing localStorage data still wins over the seed file — only fresh
+> browsers (or after a `Ctrl-Shift-Del`) see the new default.
+
+### docker-compose example
+
+```yaml
+services:
+  org-chart:
+    image: ghcr.io/xozy22/org-chart:latest
+    container_name: org-chart
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      # OPTIONAL — provide your own initial chart that fresh visitors
+      # see when their localStorage is empty. Leave commented to keep
+      # the demo data that ships inside the image.
+      - ./my-chart.json:/usr/share/nginx/html/sample-data.json:ro
+```
+
+```bash
+docker compose up -d
+```
+
+---
+
 ## Make the published image public
 
 GHCR packages start out **private**. To allow `docker pull
