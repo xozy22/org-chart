@@ -9,6 +9,10 @@ import { countryName } from './countries.js';
  *
  * The dropdowns are populated from the live store so they only ever offer
  * values that actually appear in the chart.
+ *
+ * Filter state is mirrored into the URL hash (`#q=…&dept=…&country=…&root=…`)
+ * so the current view can be shared verbatim — opening such a link
+ * pre-applies the filters on bootstrap.
  */
 
 function $(sel) {
@@ -28,6 +32,54 @@ function descendantsOf(rootId, nodes) {
     }
   }
   return ids;
+}
+
+/* -------------------------------------------------------------------- */
+/*  URL-hash sync                                                       */
+/* -------------------------------------------------------------------- */
+
+const URL_KEYS = { query: 'q', department: 'dept', country: 'country', rootId: 'root' };
+
+/** Read filter values from `location.hash` (e.g. `#q=foo&dept=Technik`). */
+function readHash() {
+  const out = { query: '', department: '', country: '', rootId: '' };
+  const raw = (location.hash || '').replace(/^#/, '');
+  if (!raw) return out;
+  for (const part of raw.split('&')) {
+    if (!part) continue;
+    const [k, v = ''] = part.split('=');
+    const decoded = (() => {
+      try {
+        return decodeURIComponent(v.replace(/\+/g, ' '));
+      } catch {
+        return '';
+      }
+    })();
+    for (const [field, key] of Object.entries(URL_KEYS)) {
+      if (k === key) out[field] = decoded;
+    }
+  }
+  return out;
+}
+
+function buildHash(filters) {
+  const parts = [];
+  if (filters.query) parts.push(`${URL_KEYS.query}=${encodeURIComponent(filters.query)}`);
+  if (filters.department) parts.push(`${URL_KEYS.department}=${encodeURIComponent(filters.department)}`);
+  if (filters.country) parts.push(`${URL_KEYS.country}=${encodeURIComponent(filters.country)}`);
+  if (filters.rootId) parts.push(`${URL_KEYS.rootId}=${encodeURIComponent(filters.rootId)}`);
+  return parts.length ? '#' + parts.join('&') : '';
+}
+
+/** Replace the URL hash without polluting the back/forward history. */
+function writeHash(filters) {
+  const hash = buildHash(filters);
+  const target = location.pathname + location.search + hash;
+  // Use replaceState so each keystroke in the search field doesn't
+  // produce a new history entry; the user can still bookmark or copy
+  // the URL at any time and back/forward only reflects the apply step
+  // when navigated externally.
+  history.replaceState(null, '', target);
 }
 
 function nodeMatches(node, filters) {
@@ -144,6 +196,9 @@ export function setupFilters({ chart, store }) {
     const filters = readFilters();
     const isActive = !!(filters.query || filters.department || filters.country || filters.rootId);
 
+    // Mirror state into the URL so the current filtered view is shareable.
+    writeHash(filters);
+
     chart.clearHighlighting();
 
     if (!isActive) {
@@ -201,6 +256,43 @@ export function setupFilters({ chart, store }) {
   resetBtn.addEventListener('click', clearAll);
 
   refreshDropdowns();
+
+  /* ------------------------------------------------------------------ */
+  /*  Apply URL hash on bootstrap so deep-links pre-populate the filter */
+  /* ------------------------------------------------------------------ */
+  const initial = readHash();
+  let hadInitialHash = false;
+  if (searchInput && initial.query) {
+    searchInput.value = initial.query;
+    hadInitialHash = true;
+  }
+  if (initial.department && [...deptSelect.options].some((o) => o.value === initial.department)) {
+    deptSelect.value = initial.department;
+    hadInitialHash = true;
+  }
+  if (initial.country && [...countrySelect.options].some((o) => o.value === initial.country)) {
+    countrySelect.value = initial.country;
+    hadInitialHash = true;
+  }
+  if (initial.rootId && [...rootSelect.options].some((o) => o.value === initial.rootId)) {
+    rootSelect.value = initial.rootId;
+    hadInitialHash = true;
+  }
+  if (hadInitialHash) {
+    // Defer one tick so the chart has finished rendering before we try
+    // to highlight matching nodes via setHighlighted().
+    setTimeout(apply, 0);
+  }
+
+  // React to manual hash edits or back/forward navigation.
+  window.addEventListener('hashchange', () => {
+    const h = readHash();
+    if (searchInput) searchInput.value = h.query;
+    deptSelect.value = h.department;
+    countrySelect.value = h.country;
+    rootSelect.value = h.rootId;
+    apply();
+  });
 
   // Re-apply dimming whenever d3-org-chart mutates the chart DOM. The most
   // common trigger is the user expanding or collapsing a subtree via the
