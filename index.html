@@ -61,6 +61,26 @@
 
     <main id="chart" class="chart"></main>
 
+    <!-- Floating bar for multi-select bulk operations. Hidden until ≥ 1 selected. -->
+    <div id="bulk-bar" class="bulk-bar" hidden role="toolbar" aria-label="Massenbearbeitung">
+      <span class="bulk-bar-count" id="bulk-count">0 ausgewählt</span>
+      <span class="bulk-bar-divider"></span>
+      <label class="bulk-bar-field">
+        <span>Abteilung →</span>
+        <select id="bulk-department">
+          <option value="">–</option>
+        </select>
+      </label>
+      <label class="bulk-bar-field">
+        <span>Land →</span>
+        <select id="bulk-country">
+          <option value="">–</option>
+        </select>
+      </label>
+      <button type="button" id="bulk-delete" class="btn btn-danger">🗑 Löschen</button>
+      <button type="button" id="bulk-clear" class="btn btn-ghost">✕ Aufheben</button>
+    </div>
+
     <!-- Modal für Add/Edit -->
     <div id="modal" class="modal" hidden>
       <div class="modal-backdrop" data-close></div>

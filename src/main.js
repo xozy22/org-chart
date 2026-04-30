@@ -6,11 +6,14 @@ import { exportJson, importJson, importCsv } from './io.js';
 import { setupFilters } from './filters.js';
 import { exportPng, exportSvg, exportPdf } from './exporter.js';
 import { createHistory } from './history.js';
+import { createSelection } from './selection.js';
+import { COUNTRIES, countryName } from './countries.js';
 
 let chart = null;
 let modal = null;
 let filtersRef = null;
 let history = null;
+let selection = null;
 
 function toast(message, kind = 'info', ms = 2400) {
   const el = document.getElementById('toast');
@@ -127,6 +130,25 @@ function bindToolbar() {
 
 function bindNodeActionDelegation() {
   const container = document.getElementById('chart');
+
+  // Ctrl/Cmd-click on any card body toggles its selection. Plain clicks
+  // (without modifier) clear the selection — same intuition as a file
+  // manager. Action-button clicks (`[data-action]`) bypass this entirely.
+  container.addEventListener('click', (ev) => {
+    if (!(ev.target instanceof Element)) return;
+    if (ev.target.closest('[data-action]')) return;
+    const card = ev.target.closest('.node-card[data-id]');
+    if (!card) return;
+    const id = card.getAttribute('data-id');
+    if (ev.ctrlKey || ev.metaKey) {
+      ev.preventDefault();
+      selection.toggle(id);
+      return;
+    }
+    // Plain click on a card: clear selection (if any), do nothing else.
+    if (selection.size() > 0) selection.clear();
+  });
+
   container.addEventListener('click', (ev) => {
     const target = ev.target instanceof Element ? ev.target.closest('[data-action]') : null;
     if (!target) return;
@@ -179,6 +201,85 @@ function doRedo() {
   toast('Wiederhergestellt', 'info', 1500);
 }
 
+/* -------------------------------------------------------------------- */
+/*  Bulk action bar — appears when ≥ 1 card is multi-selected           */
+/* -------------------------------------------------------------------- */
+function refreshBulkDropdowns() {
+  const deptSel = document.getElementById('bulk-department');
+  const countrySel = document.getElementById('bulk-country');
+  // Department options pulled from the live store
+  const depts = store.listDepartments();
+  deptSel.innerHTML =
+    '<option value="">Abteilung wählen…</option>' +
+    '<option value="__clear__">— Abteilung leeren —</option>' +
+    depts.map((d) => `<option value="${d.replace(/"/g, '&quot;')}">${d}</option>`).join('');
+  // Country options — full ISO list since you might want to assign a new one
+  countrySel.innerHTML =
+    '<option value="">Land wählen…</option>' +
+    '<option value="__clear__">— Land leeren —</option>' +
+    COUNTRIES.map((c) => `<option value="${c.code}">${c.code.toUpperCase()} — ${c.name}</option>`).join('');
+}
+
+function syncBulkBar({ size, ids }) {
+  const bar = document.getElementById('bulk-bar');
+  const count = document.getElementById('bulk-count');
+  if (size === 0) {
+    bar.hidden = true;
+    return;
+  }
+  bar.hidden = false;
+  count.textContent = `${size} ausgewählt`;
+  refreshBulkDropdowns();
+  // Reset the dropdowns to the placeholder each time selection changes
+  document.getElementById('bulk-department').value = '';
+  document.getElementById('bulk-country').value = '';
+}
+
+function bindBulkBar() {
+  const deleteBtn = document.getElementById('bulk-delete');
+  const clearBtn = document.getElementById('bulk-clear');
+  const deptSel = document.getElementById('bulk-department');
+  const countrySel = document.getElementById('bulk-country');
+
+  deleteBtn.addEventListener('click', () => {
+    const ids = selection.getAll();
+    if (!ids.length) return;
+    const ok = window.confirm(
+      `${ids.length} Knoten löschen? Untergeordnete Knoten werden eine Ebene nach oben verschoben.`,
+    );
+    if (!ok) return;
+    ids.forEach((id) => store.remove(id, { reparentChildren: true }));
+    selection.clear();
+    rerender();
+    toast(`${ids.length} Knoten gelöscht`);
+  });
+
+  clearBtn.addEventListener('click', () => selection.clear());
+
+  deptSel.addEventListener('change', () => {
+    const value = deptSel.value;
+    if (!value) return;
+    const ids = selection.getAll();
+    const newDept = value === '__clear__' ? '' : value;
+    ids.forEach((id) => store.update(id, { department: newDept }));
+    rerender();
+    toast(`${ids.length} Knoten zu „${newDept || '(keine Abteilung)'}" zugewiesen`);
+    deptSel.value = '';
+  });
+
+  countrySel.addEventListener('change', () => {
+    const value = countrySel.value;
+    if (!value) return;
+    const ids = selection.getAll();
+    const newCountry = value === '__clear__' ? '' : value;
+    ids.forEach((id) => store.update(id, { country: newCountry }));
+    rerender();
+    const label = newCountry ? countryName(newCountry) : '(kein Land)';
+    toast(`${ids.length} Knoten auf „${label}" gesetzt`);
+    countrySel.value = '';
+  });
+}
+
 function bindKeyboardShortcuts() {
   document.addEventListener('keydown', (ev) => {
     // Ignore when the user is typing in a form field
@@ -198,6 +299,15 @@ function bindKeyboardShortcuts() {
     } else if ((key === 'z' && ev.shiftKey) || key === 'y') {
       ev.preventDefault();
       doRedo();
+    }
+  });
+  // Esc clears the selection (works regardless of focus target — since
+  // typing in form fields is already filtered out above we never reach
+  // here for input contexts; this listener is a no-op outside of forms).
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape') return;
+    if (selection && selection.size() > 0) {
+      selection.clear();
     }
   });
 }
@@ -223,9 +333,16 @@ async function bootstrap() {
   history.reset(store.snapshot());
   syncHistoryButtons(history.getStatus());
 
+  // Multi-select state — Ctrl/Cmd-click toggles cards, Esc clears.
+  selection = createSelection({
+    chartHost: document.getElementById('chart'),
+    onChange: syncBulkBar,
+  });
+
   bindToolbar();
   bindNodeActionDelegation();
   bindKeyboardShortcuts();
+  bindBulkBar();
 
   // Filter bar — keeps its dropdowns in sync with the live store after every
   // data mutation so freshly added departments / countries / roots show up.

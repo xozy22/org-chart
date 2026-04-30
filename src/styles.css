@@ -604,6 +604,119 @@ svg path.link,
   filter: grayscale(0.2);
 }
 
+/* Multi-select highlight — Ctrl/Cmd-Click toggles. Clearly distinct from
+   search highlighting (red): we use a strong cobalt frame + check badge. */
+.node-card.is-selected {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.30), var(--shadow-md);
+}
+
+.node-card.is-selected::after {
+  /* Override the hover-only left rail: persistent fat blue bar. */
+  width: 4px;
+  background: #2563eb;
+}
+
+.node-card.is-selected .node-card-name-text::before {
+  content: '✓ ';
+  color: #2563eb;
+  font-weight: 800;
+}
+
+/* =========================================================
+   Bulk-action floating bar
+   ========================================================= */
+.bulk-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--ft-night);
+  color: white;
+  border: 1px solid var(--ft-graphite);
+  border-radius: 999px;
+  box-shadow: var(--shadow-lg);
+  z-index: 150;
+  animation: bulkBarIn 0.22s ease-out;
+}
+
+.bulk-bar[hidden] { display: none; }
+
+@keyframes bulkBarIn {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.bulk-bar-count {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 0 8px;
+  color: white;
+}
+
+.bulk-bar-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--ft-graphite);
+}
+
+.bulk-bar-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  letter-spacing: 0.3px;
+}
+
+.bulk-bar-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 30px;
+  padding: 0 24px 0 10px;
+  border: 1px solid var(--ft-graphite);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.06);
+  color: white;
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23cbd5e1' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+.bulk-bar-field select:focus {
+  outline: none;
+  border-color: var(--ft-red);
+  box-shadow: 0 0 0 3px rgba(218, 41, 28, 0.30);
+}
+
+.bulk-bar .btn {
+  height: 30px;
+  font-size: 12px;
+  padding: 0 12px;
+}
+
+.bulk-bar .btn.btn-ghost {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--ft-graphite);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.bulk-bar .btn.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: white;
+  border-color: var(--ft-silver);
+}
+
 /* =========================================================
    Multiple roots — each top-level node is its own coloured
    "container" so users can see at a glance which subtree it
