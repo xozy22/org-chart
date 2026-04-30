@@ -61,6 +61,15 @@
 
     <main id="chart" class="chart"></main>
 
+    <!-- Minimap pinned to the bottom-right of the canvas. The canvas
+         itself is appended by minimap.js. -->
+    <aside id="minimap" class="minimap" aria-label="Übersicht">
+      <header class="minimap-header">
+        <span>Übersicht</span>
+        <button type="button" id="minimap-toggle" class="minimap-toggle" title="Übersicht ein-/ausblenden" aria-label="Übersicht ein-/ausblenden">−</button>
+      </header>
+    </aside>
+
     <!-- Floating bar for multi-select bulk operations. Hidden until ≥ 1 selected. -->
     <div id="bulk-bar" class="bulk-bar" hidden role="toolbar" aria-label="Massenbearbeitung">
       <span class="bulk-bar-count" id="bulk-count">0 ausgewählt</span>

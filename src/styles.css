@@ -624,6 +624,61 @@ svg path.link,
 }
 
 /* =========================================================
+   Minimap — bottom-right overview panel
+   ========================================================= */
+.minimap {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  z-index: 80;
+  transition: transform 0.18s ease;
+}
+
+.minimap.is-collapsed { transform: translateY(calc(100% - 30px)); }
+
+.minimap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--ft-night);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  user-select: none;
+  cursor: default;
+}
+
+.minimap-toggle {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--ft-graphite);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.minimap-toggle:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.minimap-canvas {
+  display: block;
+  cursor: crosshair;
+}
+
+/* =========================================================
    Bulk-action floating bar
    ========================================================= */
 .bulk-bar {

@@ -7,6 +7,7 @@ import { setupFilters } from './filters.js';
 import { exportPng, exportSvg, exportPdf } from './exporter.js';
 import { createHistory } from './history.js';
 import { createSelection } from './selection.js';
+import { createMinimap } from './minimap.js';
 import { COUNTRIES, countryName } from './countries.js';
 
 let chart = null;
@@ -343,6 +344,17 @@ async function bootstrap() {
   bindNodeActionDelegation();
   bindKeyboardShortcuts();
   bindBulkBar();
+
+  // Minimap — bottom-right overview, click to recentre on the closest node.
+  const minimapHost = document.getElementById('minimap');
+  if (minimapHost) {
+    createMinimap({ chart, host: minimapHost });
+    document.getElementById('minimap-toggle').addEventListener('click', () => {
+      const collapsed = minimapHost.classList.toggle('is-collapsed');
+      const btn = document.getElementById('minimap-toggle');
+      btn.textContent = collapsed ? '+' : '−';
+    });
+  }
 
   // Filter bar — keeps its dropdowns in sync with the live store after every
   // data mutation so freshly added departments / countries / roots show up.
