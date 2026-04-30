@@ -15,6 +15,7 @@
         <button id="btn-fit" class="btn" title="Diagramm zentrieren">Zentrieren</button>
         <button id="btn-expand-all" class="btn" title="Alle ausklappen">Alle aufklappen</button>
         <button id="btn-collapse-all" class="btn" title="Alle einklappen">Alle einklappen</button>
+        <button id="btn-settings" class="btn btn-icon" title="Eigene Felder verwalten" aria-label="Eigene Felder verwalten">⚙</button>
       </div>
 
       <div class="toolbar-group toolbar-search">
@@ -178,6 +179,9 @@
           </label>
           <datalist id="country-list"></datalist>
 
+          <!-- Slot for dynamically-rendered custom fields. -->
+          <div id="custom-fields-slot" class="custom-fields-slot"></div>
+
           <footer class="modal-footer">
             <button type="button" id="btn-delete" class="btn btn-danger" hidden>Löschen</button>
             <span class="spacer"></span>
@@ -185,6 +189,44 @@
             <button type="submit" class="btn btn-primary">Speichern</button>
           </footer>
         </form>
+      </div>
+    </div>
+
+    <!-- Custom-Fields Verwaltung -->
+    <div id="settings-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-dialog modal-dialog--wide">
+        <header class="modal-header">
+          <h2>Eigene Felder</h2>
+          <button class="modal-close" data-close aria-label="Schließen">×</button>
+        </header>
+        <div class="modal-body">
+          <p class="modal-hint">
+            Definiere zusätzliche Felder, die jedem Knoten zur Verfügung stehen.
+            Sichtbare Felder werden direkt auf der Karte angezeigt.
+          </p>
+          <div id="custom-fields-list" class="custom-field-list"></div>
+          <form id="custom-field-form" class="custom-field-form" autocomplete="off">
+            <input name="key" type="text" placeholder="Schlüssel (z. B. office)" required pattern="[a-zA-Z][a-zA-Z0-9_]*" title="Buchstaben, Ziffern und Unterstrich; muss mit Buchstabe beginnen" />
+            <input name="label" type="text" placeholder="Anzeigename (z. B. Büro)" required />
+            <select name="type">
+              <option value="text">Text</option>
+              <option value="number">Zahl</option>
+              <option value="date">Datum</option>
+              <option value="url">URL</option>
+              <option value="email">E-Mail</option>
+            </select>
+            <label class="custom-field-checkbox">
+              <input name="showOnCard" type="checkbox" checked />
+              <span>auf Karte anzeigen</span>
+            </label>
+            <button type="submit" class="btn btn-primary">+ Feld hinzufügen</button>
+          </form>
+        </div>
+        <footer class="modal-footer">
+          <span class="spacer"></span>
+          <button type="button" class="btn" data-close>Schließen</button>
+        </footer>
       </div>
     </div>
 

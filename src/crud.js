@@ -25,6 +25,41 @@ function populateDepartmentDatalist(store) {
     .join('');
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Render the dynamic custom-fields section in the node modal. */
+function renderCustomFields(store) {
+  const slot = $('#custom-fields-slot');
+  if (!slot) return;
+  const fields = store.customFields || [];
+  if (fields.length === 0) {
+    slot.innerHTML = '';
+    return;
+  }
+  slot.innerHTML = fields
+    .map(
+      (f) => `
+        <label data-custom="${escapeHtml(f.key)}">
+          <span>${escapeHtml(f.label)}</span>
+          <input
+            name="${escapeHtml(f.key)}"
+            type="${escapeHtml(f.type || 'text')}"
+            data-custom-field="1"
+            autocomplete="off"
+          />
+        </label>
+      `,
+    )
+    .join('');
+}
+
 export function setupModal({ store, onChange }) {
   const modal = $('#modal');
   const form = $('#node-form');
@@ -141,6 +176,13 @@ export function setupModal({ store, onChange }) {
         input.value = node?.[key] ?? '';
       }
     });
+    // Custom fields (rendered dynamically — query by data attribute)
+    for (const cf of store.customFields || []) {
+      const input = form.elements.namedItem(cf.key);
+      if (input instanceof HTMLInputElement) {
+        input.value = node?.[cf.key] ?? '';
+      }
+    }
     syncFlagPreview();
     syncDeptColor();
   }
@@ -156,6 +198,15 @@ export function setupModal({ store, onChange }) {
         data[key] = v === '' ? null : v;
       }
     });
+    // Custom fields — pass-through, empty strings stored as ''
+    const custom = {};
+    for (const cf of store.customFields || []) {
+      const input = form.elements.namedItem(cf.key);
+      if (input instanceof HTMLInputElement) {
+        custom[cf.key] = (input.value || '').trim();
+      }
+    }
+    data._custom = custom;
     return data;
   }
 
@@ -164,6 +215,7 @@ export function setupModal({ store, onChange }) {
     titleEl.textContent = parentId ? 'Untergeordneten Knoten hinzufügen' : 'Neuen Knoten hinzufügen';
     deleteBtn.hidden = true;
     populateDepartmentDatalist(store);
+    renderCustomFields(store);
     fillForm({ id: store.nextId(), parentId, name: '', title: '', department: '', email: '', phone: '', imageUrl: '', country: '' });
     openModal();
   }
@@ -176,6 +228,7 @@ export function setupModal({ store, onChange }) {
     titleEl.textContent = 'Knoten bearbeiten';
     deleteBtn.hidden = false;
     populateDepartmentDatalist(store);
+    renderCustomFields(store);
     fillForm(node);
     openModal();
   }
@@ -212,6 +265,7 @@ export function setupModal({ store, onChange }) {
         phone: data.phone,
         imageUrl: data.imageUrl,
         country: data.country ?? '',
+        ...(data._custom || {}),
       });
     } else {
       store.update(currentId, {
@@ -222,6 +276,7 @@ export function setupModal({ store, onChange }) {
         phone: data.phone,
         imageUrl: data.imageUrl,
         country: data.country ?? '',
+        ...(data._custom || {}),
       });
     }
 

@@ -8,6 +8,7 @@ import { exportPng, exportSvg, exportPdf } from './exporter.js';
 import { createHistory } from './history.js';
 import { createSelection } from './selection.js';
 import { createMinimap } from './minimap.js';
+import { setupCustomFieldsUI } from './customFields.js';
 import { COUNTRIES, countryName } from './countries.js';
 
 let chart = null;
@@ -78,9 +79,10 @@ function bindToolbar() {
     const file = jsonInput.files?.[0];
     if (!file) return;
     try {
-      const { nodes, departments } = await importJson(file);
+      const { nodes, departments, customFields } = await importJson(file);
       store.set(nodes);
       store.departments = departments || {};
+      if (customFields && customFields.length) store.customFields = customFields;
       store.save();
       rerender();
       toast(`${nodes.length} Knoten importiert`);
@@ -91,7 +93,7 @@ function bindToolbar() {
     }
   });
   document.getElementById('btn-export-json').addEventListener('click', () => {
-    exportJson(store.get(), store.departments);
+    exportJson(store.get(), store.departments, store.customFields);
     toast('JSON heruntergeladen');
   });
 
@@ -102,7 +104,7 @@ function bindToolbar() {
     const file = csvInput.files?.[0];
     if (!file) return;
     try {
-      const { nodes } = await importCsv(file);
+      const { nodes } = await importCsv(file, store.customFields);
       store.set(nodes);
       rerender();
       toast(`${nodes.length} Zeilen importiert`);
@@ -355,6 +357,12 @@ async function bootstrap() {
       btn.textContent = collapsed ? '+' : '−';
     });
   }
+
+  // Custom-fields settings — opens via the toolbar's ⚙ button.
+  setupCustomFieldsUI({
+    store,
+    onChange: () => rerender(),
+  });
 
   // Filter bar — keeps its dropdowns in sync with the live store after every
   // data mutation so freshly added departments / countries / roots show up.

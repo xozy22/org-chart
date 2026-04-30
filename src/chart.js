@@ -152,6 +152,33 @@ export function withVirtualRoot(nodes) {
   return out;
 }
 
+/** Render every custom field that has `showOnCard: true` and a non-empty
+ *  value as a small key/value row at the bottom of the card. */
+function renderCustomFieldsOnCard(data) {
+  const fields = store.customFields || [];
+  if (!fields.length) return '';
+  const rows = [];
+  for (const f of fields) {
+    if (!f.showOnCard) continue;
+    const raw = data[f.key];
+    if (raw == null || raw === '') continue;
+    let display = raw;
+    if (f.type === 'url') {
+      const safe = escapeHtml(raw);
+      display = `<a href="${safe}" target="_blank" rel="noopener noreferrer">${safe}</a>`;
+    } else if (f.type === 'email') {
+      const safe = escapeHtml(raw);
+      display = `<a href="mailto:${safe}">${safe}</a>`;
+    } else {
+      display = escapeHtml(raw);
+    }
+    rows.push(
+      `<div class="node-card-cfrow" title="${escapeHtml(f.label)}: ${escapeHtml(raw)}"><span class="node-card-cflabel">${escapeHtml(f.label)}</span> ${display}</div>`,
+    );
+  }
+  return rows.join('');
+}
+
 function renderDeptBadge(rawName) {
   const name = String(rawName || '').trim();
   if (!name) return '';
@@ -223,6 +250,7 @@ function renderNodeCard(d) {
       ${department ? renderDeptBadge(data.department) : ''}
       ${email ? `<div class="node-card-email" title="${email}">✉ ${email}</div>` : ''}
       ${phone ? `<div class="node-card-phone" title="${phone}">☎ ${phone}</div>` : ''}
+      ${renderCustomFieldsOnCard(data)}
       <div class="node-card-actions">
         <button type="button" class="node-action node-action--add" data-action="add" data-id="${escapeHtml(data.id)}" title="Untergeordneten Knoten hinzufügen">+</button>
         <button type="button" class="node-action node-action--edit" data-action="edit" data-id="${escapeHtml(data.id)}" title="Bearbeiten">✎</button>
@@ -238,7 +266,18 @@ export function createChart(container, rawData, handlers = {}) {
     .container(container)
     .data(data)
     .nodeWidth((d) => (d.data._virtual ? 1 : 240))
-    .nodeHeight((d) => (d.data._virtual ? 1 : 150))
+    .nodeHeight((d) => {
+      if (d.data._virtual) return 1;
+      // Reserve ~16px of vertical space for each custom field rendered
+      // on the card so the layout doesn't crop them.
+      const visible = (store.customFields || []).filter((f) => f.showOnCard).length;
+      const visibleOnThisNode = visible > 0
+        ? (store.customFields || []).filter(
+            (f) => f.showOnCard && d.data?.[f.key] != null && d.data?.[f.key] !== '',
+          ).length
+        : 0;
+      return 150 + visibleOnThisNode * 16;
+    })
     .childrenMargin((d) => (d.data?._virtual ? 0 : 60))
     .compactMarginBetween(() => 35)
     .compactMarginPair(() => 30)
