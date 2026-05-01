@@ -10,7 +10,9 @@ import { createSelection } from './selection.js';
 import { createMinimap } from './minimap.js';
 import { setupCustomFieldsUI } from './customFields.js';
 import { computeStats } from './stats.js';
+import { bindNodeDrag, applyManualPositions } from './freeLayout.js';
 import { COUNTRIES, countryName } from './countries.js';
+import type { LayoutMode } from './types.js';
 
 let chart = null;
 let modal = null;
@@ -34,6 +36,61 @@ function rerender() {
   // Keep filter dropdowns in sync with the latest data so new departments,
   // countries or roots appear immediately as filter options.
   filtersRef?.refreshDropdowns();
+  // In free mode rebind d3-drag because d3-org-chart rebuilds the
+  // `<g class="node">` elements from scratch on every render.
+  if (store.layoutMode === 'free') {
+    requestAnimationFrame(() => bindNodeDrag(chart, store));
+  }
+}
+
+function syncLayoutToggleUI() {
+  const btn = document.getElementById('btn-layout-mode') as HTMLButtonElement | null;
+  if (btn) {
+    btn.textContent = store.layoutMode === 'free' ? '🔀 Frei' : '🔀 Auto';
+    btn.title =
+      store.layoutMode === 'free'
+        ? 'Auf automatisches Layout zurückwechseln'
+        : 'Auf manuelle Anordnung wechseln';
+    btn.classList.toggle('btn-primary', store.layoutMode === 'free');
+  }
+  const chartHost = document.getElementById('chart');
+  if (chartHost) chartHost.classList.toggle('is-free', store.layoutMode === 'free');
+
+  // Disable expand/collapse controls in free mode — they would shuffle the
+  // tree and stomp on the user's manual placement.
+  const isFree = store.layoutMode === 'free';
+  ['btn-expand-all', 'btn-collapse-all', 'btn-fit'].forEach((id) => {
+    const el = document.getElementById(id) as HTMLButtonElement | null;
+    if (el) el.disabled = isFree;
+  });
+}
+
+function setLayoutMode(mode: LayoutMode) {
+  if (store.layoutMode === mode) return;
+  store.layoutMode = mode;
+  store.save();
+  syncLayoutToggleUI();
+
+  rerender();
+
+  if (mode === 'free') {
+    // Free mode contract: every node is on the canvas. Expand the tree
+    // *after* the data() call, otherwise d3-org-chart's render rebuilds
+    // the hierarchy from `_expanded` flags and ignores our expand call.
+    try {
+      chart.expandAll();
+    } catch {
+      /* ignore */
+    }
+    requestAnimationFrame(() => {
+      applyManualPositions(chart, store);
+      bindNodeDrag(chart, store);
+      chart.fit();
+    });
+  } else {
+    requestAnimationFrame(() => chart.fit());
+  }
+  toast(mode === 'free' ? 'Freies Layout aktiv' : 'Automatisches Layout aktiv');
 }
 
 async function loadInitialData() {
@@ -66,6 +123,9 @@ function bindToolbar() {
   document.getElementById('btn-fit').addEventListener('click', () => chart.fit());
   document.getElementById('btn-expand-all').addEventListener('click', () => chart.expandAll().fit());
   document.getElementById('btn-collapse-all').addEventListener('click', () => collapseAllSubtrees(chart));
+  document.getElementById('btn-layout-mode')?.addEventListener('click', () => {
+    setLayoutMode(store.layoutMode === 'free' ? 'auto' : 'free');
+  });
 
   // Undo / Redo
   const undoBtn = document.getElementById('btn-undo');
@@ -488,6 +548,25 @@ async function bootstrap() {
 
   // Stats sidebar — opens via the toolbar's 📊 button.
   setupStatsSidebar();
+
+  // Layout-mode toggle — initialises the toolbar label, the chart-host
+  // class and (if applicable) the drag handler from the persisted state.
+  syncLayoutToggleUI();
+  if (store.layoutMode === 'free') {
+    // Free mode contract: every node visible. Expand the tree on
+    // first paint as well (collapse pills are disabled in free mode
+    // anyway so the user can't undo it accidentally).
+    try {
+      chart.expandAll();
+    } catch {
+      /* ignore */
+    }
+    requestAnimationFrame(() => {
+      applyManualPositions(chart, store);
+      bindNodeDrag(chart, store);
+      chart.fit();
+    });
+  }
 
   // Filter bar — keeps its dropdowns in sync with the live store after every
   // data mutation so freshly added departments / countries / roots show up.

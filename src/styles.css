@@ -360,6 +360,28 @@ body {
     linear-gradient(180deg, #FAFBFC 0%, #F0F2F5 100%);
 }
 
+/* Free-layout mode: tighter, contrasted dot grid that the cards visibly
+   snap to, plus visual cues that the cards are draggable and that the
+   collapse pills are inactive. */
+.chart.is-free {
+  background:
+    radial-gradient(circle at 1px 1px, rgba(15, 17, 21, 0.18) 1px, transparent 0) 0 0 / 20px 20px,
+    linear-gradient(180deg, #F4F6F8 0%, #E9ECEF 100%);
+}
+
+.chart.is-free g.node {
+  cursor: grab;
+}
+.chart.is-free g.node:active {
+  cursor: grabbing;
+}
+
+/* Hide the expand/collapse pill in free mode — the user has full control
+   over what's visible by manually positioning cards. */
+.chart.is-free g.node-button-g {
+  display: none;
+}
+
 /* SVG link styling — d3-org-chart uses .link inside chart group.
    The selectors are deliberately ancestor-free so they also apply when
    the chart's SVG is rendered detached (e.g. inside the export pipeline,

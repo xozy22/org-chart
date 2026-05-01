@@ -1,5 +1,6 @@
 import { COUNTRIES, countryCode, countryName } from './countries.js';
 import { defaultDepartmentColor } from './departments.js';
+import { computeNewNodePosition } from './freeLayout.js';
 
 const FIELDS = ['id', 'parentId', 'name', 'title', 'department', 'email', 'phone', 'imageUrl', 'country'];
 
@@ -255,9 +256,14 @@ export function setupModal({ store, onChange }: { store: any; onChange?: () => v
     }
 
     if (mode === 'add') {
+      // In free mode, seed the new node's position so it lands gridded
+      // under its parent (or right of the rightmost sibling).
+      const parentId = data.parentId ?? null;
+      const seed = computeNewNodePosition(parentId, store);
+      if (seed) store.manualPositions[String(data.id)] = seed;
       store.add({
         id: data.id,
-        parentId: data.parentId ?? null,
+        parentId,
         name: data.name,
         title: data.title,
         department: data.department,

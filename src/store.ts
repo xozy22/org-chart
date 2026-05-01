@@ -1,9 +1,11 @@
 import { defaultDepartmentColor } from './departments.js';
-import type { OrgNode, NodeId, CustomField, Snapshot } from './types.js';
+import type { OrgNode, NodeId, CustomField, Snapshot, LayoutMode, Position } from './types.js';
 
 const STORAGE_KEY = 'orgchart.data.v1';
 const DEPT_KEY = 'orgchart.departments.v1';
 const CUSTOM_FIELDS_KEY = 'orgchart.customfields.v1';
+const LAYOUT_MODE_KEY = 'orgchart.layoutmode.v1';
+const POSITIONS_KEY = 'orgchart.positions.v1';
 
 /** Built-in node fields that user-defined custom fields must not shadow. */
 const RESERVED_FIELD_KEYS: Set<string> = new Set([
@@ -22,6 +24,13 @@ export const store = {
   /** User-defined custom fields. Each entry is `{ key, label, type, showOnCard }`.
    *  Values for these fields are stored directly on each node under the same key. */
   customFields: [] as CustomField[],
+
+  /** Active layout mode. `auto` = d3-org-chart's tree layout (default).
+   *  `free` = user-placed cards on a 20-px grid. */
+  layoutMode: 'auto' as LayoutMode,
+
+  /** Per-node x/y overrides applied in free-layout mode. Keys are node IDs. */
+  manualPositions: {} as Record<NodeId, Position>,
 
   /** Subscribers notified on every mutation that changes persistent state.
    *  Used by the history module to record snapshots for undo/redo. */
@@ -43,28 +52,38 @@ export const store = {
   },
 
   /** Deep-cloned snapshot of the persistent state. */
-  snapshot() {
+  snapshot(): Snapshot {
     return {
       nodes: JSON.parse(JSON.stringify(this.nodes)),
       departments: JSON.parse(JSON.stringify(this.departments)),
       customFields: JSON.parse(JSON.stringify(this.customFields)),
+      layoutMode: this.layoutMode,
+      manualPositions: JSON.parse(JSON.stringify(this.manualPositions)),
     };
   },
 
   /** Replace state from a snapshot WITHOUT firing change listeners.
    *  Persists to localStorage so a reload picks up the restored state.
    *  Used by undo/redo so applying a history entry doesn't push a new one. */
-  restore(snap) {
+  restore(snap: Snapshot | null | undefined) {
     if (!snap) return;
     this.nodes = JSON.parse(JSON.stringify(snap.nodes || []));
     this.departments = JSON.parse(JSON.stringify(snap.departments || {}));
     if (snap.customFields) {
       this.customFields = JSON.parse(JSON.stringify(snap.customFields));
     }
+    if (snap.layoutMode === 'free' || snap.layoutMode === 'auto') {
+      this.layoutMode = snap.layoutMode;
+    }
+    if (snap.manualPositions) {
+      this.manualPositions = JSON.parse(JSON.stringify(snap.manualPositions));
+    }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.nodes));
       localStorage.setItem(DEPT_KEY, JSON.stringify(this.departments));
       localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(this.customFields));
+      localStorage.setItem(LAYOUT_MODE_KEY, this.layoutMode);
+      localStorage.setItem(POSITIONS_KEY, JSON.stringify(this.manualPositions));
     } catch (err) {
       console.warn('localStorage persist failed', err);
     }
@@ -146,6 +165,25 @@ export const store = {
     } catch {
       /* ignore */
     }
+    try {
+      const rawMode = localStorage.getItem(LAYOUT_MODE_KEY);
+      if (rawMode === 'free' || rawMode === 'auto') {
+        this.layoutMode = rawMode;
+      }
+    } catch {
+      /* ignore */
+    }
+    try {
+      const rawPos = localStorage.getItem(POSITIONS_KEY);
+      if (rawPos) {
+        const parsed = JSON.parse(rawPos);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          this.manualPositions = parsed;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
     return nodes;
   },
 
@@ -154,6 +192,8 @@ export const store = {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.nodes));
       localStorage.setItem(DEPT_KEY, JSON.stringify(this.departments));
       localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(this.customFields));
+      localStorage.setItem(LAYOUT_MODE_KEY, this.layoutMode);
+      localStorage.setItem(POSITIONS_KEY, JSON.stringify(this.manualPositions));
     } catch (err) {
       console.warn('localStorage persist failed', err);
     }
@@ -226,24 +266,31 @@ export const store = {
   remove(id, { reparentChildren = true } = {}) {
     const target = this.byId(id);
     if (!target) return;
+    const removedIds = new Set<string>();
     if (reparentChildren) {
       this.nodes.forEach((n) => {
         if (String(n.parentId) === String(id)) n.parentId = target.parentId;
       });
       this.nodes = this.nodes.filter((n) => String(n.id) !== String(id));
+      removedIds.add(String(id));
     } else {
-      const toDelete = new Set([String(id)]);
+      removedIds.add(String(id));
       let grew = true;
       while (grew) {
         grew = false;
         for (const n of this.nodes) {
-          if (toDelete.has(String(n.parentId)) && !toDelete.has(String(n.id))) {
-            toDelete.add(String(n.id));
+          if (removedIds.has(String(n.parentId)) && !removedIds.has(String(n.id))) {
+            removedIds.add(String(n.id));
             grew = true;
           }
         }
       }
-      this.nodes = this.nodes.filter((n) => !toDelete.has(String(n.id)));
+      this.nodes = this.nodes.filter((n) => !removedIds.has(String(n.id)));
+    }
+    // Drop any free-layout positions for the now-deleted node(s) so the
+    // map doesn't grow unboundedly across the lifetime of the chart.
+    for (const rid of removedIds) {
+      delete this.manualPositions[rid];
     }
     this.save();
   },

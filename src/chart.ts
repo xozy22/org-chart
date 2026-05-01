@@ -2,6 +2,7 @@ import { OrgChart } from 'd3-org-chart';
 import { countryName } from './countries.js';
 import { softBackground } from './departments.js';
 import { store } from './store.js';
+import { applyManualPositions } from './freeLayout.js';
 
 export const VIRTUAL_ROOT_ID = '__virtual_root__';
 
@@ -301,6 +302,18 @@ export function createChart(
         this.style.opacity = '0';
         this.style.pointerEvents = 'none';
       }
+      // In free layout mode, override the transform that d3-org-chart just
+      // computed with the saved manual position. Done per-node here because
+      // a global post-render pass races with d3-org-chart's transitions.
+      if (store.layoutMode === 'free' && !d.data?._virtual && this) {
+        const pos = store.manualPositions[String(d.data.id)];
+        if (pos) {
+          d.x = pos.x;
+          d.y = pos.y;
+          const w = d.width ?? 240;
+          this.setAttribute('transform', `translate(${pos.x - w / 2},${pos.y})`);
+        }
+      }
     })
     .linkUpdate(function (d) {
       // Hide link segments that originate from the virtual root.
@@ -314,5 +327,28 @@ export function createChart(
     });
 
   chart.render();
+
+  // In free mode we override the auto-layout transforms after every render.
+  // d3-org-chart animates transforms with a ~750 ms transition, so we
+  // re-stamp the positions twice: once immediately (catches the case where
+  // there is no transition), and once after the transition has finished
+  // (catches every other case). The render call itself isn't blocked.
+  const originalRender = chart.render.bind(chart);
+  chart.render = function patchedRender(...args: any[]) {
+    const result = originalRender(...args);
+    if (store.layoutMode === 'free') {
+      requestAnimationFrame(() => applyManualPositions(chart, store));
+      setTimeout(() => applyManualPositions(chart, store), 800);
+    }
+    return result;
+  };
+
+  // Initial paint in free mode (page-load case where the user had `free`
+  // saved in localStorage from a previous session).
+  if (store.layoutMode === 'free') {
+    requestAnimationFrame(() => applyManualPositions(chart, store));
+    setTimeout(() => applyManualPositions(chart, store), 800);
+  }
+
   return chart;
 }

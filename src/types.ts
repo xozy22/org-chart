@@ -43,11 +43,23 @@ export interface OrgNode {
   [key: string]: unknown;
 }
 
+/** Layout mode — `auto` lets d3-org-chart compute positions, `free` lets the
+ *  user place each card manually on a grid. */
+export type LayoutMode = 'auto' | 'free';
+
+/** Cartesian position used to override the auto-layout in free mode. */
+export interface Position {
+  x: number;
+  y: number;
+}
+
 /** Persistent snapshot used by the undo/redo history. */
 export interface Snapshot {
   nodes: OrgNode[];
   departments: Record<string, string>;
   customFields?: CustomField[];
+  layoutMode?: LayoutMode;
+  manualPositions?: Record<string, Position>;
 }
 
 /** Result of the filter+search apply step. */
