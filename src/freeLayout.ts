@@ -52,33 +52,37 @@ function installTransformWatcher(chart: any, store: any): void {
   if (watchedHosts.has(svg)) return;
   watchedHosts.add(svg);
 
-  // Tracks which transform values we wrote ourselves so the observer
-  // doesn't recurse on its own writes.
-  const ownWrites = new WeakMap<Element, string>();
+  // Re-entrancy guard: when the observer rewrites a transform, that write
+  // synchronously fires another mutation record. We swallow exactly one
+  // record per element to break the loop.
+  const justWrote = new WeakSet<Element>();
 
   const observer = new MutationObserver((records) => {
     if (store.layoutMode !== 'free') return;
+    let changed = false;
     for (const r of records) {
-      if (r.type !== 'attributes') continue;
-      if (r.attributeName !== 'transform') continue;
+      if (r.type !== 'attributes' || r.attributeName !== 'transform') continue;
       const g = r.target as SVGGElement;
       if (!g.classList.contains('node')) continue;
+      if (justWrote.has(g)) {
+        justWrote.delete(g);
+        continue;
+      }
       const d: any = (g as any).__data__;
       if (!d || d.data?._virtual) continue;
       const pos = store.manualPositions[String(d.data.id)];
       if (!pos) continue;
       const w = d.width ?? 240;
       const desired = `translate(${pos.x - w / 2},${pos.y})`;
-      if (g.getAttribute('transform') === desired) continue;
-      if (ownWrites.get(g) === desired) continue;
-      ownWrites.set(g, desired);
+      const current = g.getAttribute('transform');
+      if (current === desired) continue;
+      justWrote.add(g);
       g.setAttribute('transform', desired);
       d.x = pos.x;
       d.y = pos.y;
+      changed = true;
     }
-    // Re-run link redraw once per record batch so connector paths
-    // chase the transformed cards.
-    redrawAllLinks(chart);
+    if (changed) redrawAllLinks(chart);
   });
 
   observer.observe(svg, {

@@ -200,33 +200,45 @@ export function setupFilters({ chart, store }) {
     // Mirror state into the URL so the current filtered view is shareable.
     writeHash(filters);
 
-    chart.clearHighlighting();
+    // Free-layout mode owns the geometry. d3-org-chart's setHighlighted /
+    // setExpanded / fit() all trigger pan-and-zoom transitions that drag
+    // the user's careful placement across the canvas, so in free mode we
+    // express the filter purely through dimming and the search-highlight
+    // CSS class on the matching cards.
+    const inFreeMode = store.layoutMode === 'free';
+
+    if (!inFreeMode) {
+      chart.clearHighlighting();
+    }
 
     if (!isActive) {
       summary.textContent = '';
       applyDimming(null);
-      chart.fit();
+      if (!inFreeMode) chart.fit();
       return;
     }
 
     const hits = store.get().filter((n) => nodeMatches(n, filters));
     const matchIds = new Set(hits.map((h) => String(h.id)));
 
-    hits.forEach((n) => {
-      try {
-        chart.setHighlighted(n.id);
-      } catch {
-        /* node may currently be collapsed */
-      }
-    });
+    if (!inFreeMode) {
+      hits.forEach((n) => {
+        try {
+          chart.setHighlighted(n.id);
+        } catch {
+          /* node may currently be collapsed */
+        }
+      });
 
-    if (hits.length > 0) {
-      try {
-        // Expand the path to the first hit so the user sees something useful.
-        chart.setExpanded(hits[0].id).render();
-        chart.fit();
-      } catch {
-        /* ignore */
+      if (hits.length > 0) {
+        try {
+          // Auto mode only: expand the path to the first hit so it becomes
+          // visible, then fit so the user can actually see it.
+          chart.setExpanded(hits[0].id).render();
+          chart.fit();
+        } catch {
+          /* ignore */
+        }
       }
     }
 
