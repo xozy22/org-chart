@@ -31,6 +31,23 @@ function toast(message: string, kind: 'info' | 'error' = 'info', ms = 2400) {
   }, ms);
 }
 
+/**
+ * Zoom the chart by a multiplicative factor (e.g. 1.25 → +25%, 0.8 → -20%).
+ * Re-uses d3-org-chart's internal d3-zoom behavior, which keeps the wheel /
+ * pinch interactions and the manual buttons in sync. A short transition
+ * gives a smoother feel than an instant snap.
+ */
+function zoomBy(factor: number) {
+  if (!chart) return;
+  const state = chart.getChartState?.();
+  const svg = state?.svg;
+  const zoomBehavior = state?.zoomBehavior;
+  if (!svg || !zoomBehavior) return;
+  // d3-zoom respects the chart's `scaleExtent` so we don't zoom past
+  // the configured limits.
+  svg.transition().duration(220).call(zoomBehavior.scaleBy, factor);
+}
+
 function rerender() {
   chart.data(withVirtualRoot(store.get())).render();
   // Keep filter dropdowns in sync with the latest data so new departments,
@@ -57,9 +74,11 @@ function syncLayoutToggleUI() {
   if (chartHost) chartHost.classList.toggle('is-free', store.layoutMode === 'free');
 
   // Disable expand/collapse controls in free mode — they would shuffle the
-  // tree and stomp on the user's manual placement.
+  // tree and stomp on the user's manual placement. Zoom + Fit stay live in
+  // both modes; in free mode Fit becomes a "view reset" that brings every
+  // card back into view without touching their placement.
   const isFree = store.layoutMode === 'free';
-  ['btn-expand-all', 'btn-collapse-all', 'btn-fit'].forEach((id) => {
+  ['btn-expand-all', 'btn-collapse-all'].forEach((id) => {
     const el = document.getElementById(id) as HTMLButtonElement | null;
     if (el) el.disabled = isFree;
   });
@@ -121,6 +140,8 @@ function bindToolbar() {
   });
 
   document.getElementById('btn-fit').addEventListener('click', () => chart.fit());
+  document.getElementById('btn-zoom-in')?.addEventListener('click', () => zoomBy(1.25));
+  document.getElementById('btn-zoom-out')?.addEventListener('click', () => zoomBy(1 / 1.25));
   document.getElementById('btn-expand-all').addEventListener('click', () => chart.expandAll().fit());
   document.getElementById('btn-collapse-all').addEventListener('click', () => collapseAllSubtrees(chart));
   document.getElementById('btn-layout-mode')?.addEventListener('click', () => {

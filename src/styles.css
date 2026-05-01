@@ -185,6 +185,43 @@ body {
   line-height: 1;
 }
 
+/* Connected zoom-out / fit / zoom-in cluster — one rounded pill split into
+   three segments, like a media player's transport. */
+.zoom-group {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.zoom-group .btn.btn-icon {
+  border-radius: 0;
+  margin: 0;
+}
+
+.zoom-group .btn.btn-icon:not(:first-child) {
+  border-left-width: 0;
+}
+
+.zoom-group .btn.btn-icon:first-child {
+  border-top-left-radius: var(--radius);
+  border-bottom-left-radius: var(--radius);
+}
+
+.zoom-group .btn.btn-icon:last-child {
+  border-top-right-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+}
+
+/* Larger glyph for the zoom +/- buttons so they read clearly. */
+.zoom-group .btn#btn-zoom-in,
+.zoom-group .btn#btn-zoom-out {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.zoom-group .btn#btn-fit {
+  font-size: 14px;
+}
+
 .btn-primary {
   background: var(--ft-red);
   border-color: var(--ft-red);
