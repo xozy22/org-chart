@@ -38,6 +38,14 @@ function cardOffset(node: any): { dx: number; dy: number } {
 const watchedHosts = new WeakSet<Element>();
 
 /**
+ * Set to true while the user is actively dragging a card. The transform
+ * watcher reads this and pauses — otherwise it would see the drag-handler's
+ * intermediate `transform` writes, look up the (still-stale)
+ * `manualPositions[id]` and snap the card right back where it started.
+ */
+let isDragging = false;
+
+/**
  * Watch every `g.node` for transform-attribute changes and immediately
  * rewrite them when the user is in free mode. d3-org-chart drives the
  * transform via a 750-ms d3-transition that overwrites whatever we put
@@ -59,6 +67,8 @@ function installTransformWatcher(chart: any, store: any): void {
 
   const observer = new MutationObserver((records) => {
     if (store.layoutMode !== 'free') return;
+    // Drag-handler is the source of truth while it's running; don't fight it.
+    if (isDragging) return;
     let changed = false;
     for (const r of records) {
       if (r.type !== 'attributes' || r.attributeName !== 'transform') continue;
@@ -212,6 +222,7 @@ export function bindNodeDrag(chart: any, store: any, onPersist?: () => void): vo
         return true;
       })
       .on('start', function () {
+        isDragging = true;
         select(this).attr('cursor', 'grabbing');
       })
       .on('drag', function (event, d: any) {
@@ -223,6 +234,7 @@ export function bindNodeDrag(chart: any, store: any, onPersist?: () => void): vo
         redrawAllLinks(chart);
       })
       .on('end', function (event, d: any) {
+        isDragging = false;
         if (d?.data?._virtual) return;
         d.x = snap(d.x);
         d.y = snap(d.y);
