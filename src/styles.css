@@ -185,42 +185,71 @@ body {
   line-height: 1;
 }
 
-/* Connected zoom-out / fit / zoom-in cluster — one rounded pill split into
-   three segments, like a media player's transport. */
-.zoom-group {
-  display: inline-flex;
-  align-items: stretch;
+/* =========================================================
+   Floating zoom + fit cluster — bottom-left, Google Maps style
+   ========================================================= */
+.zoom-fab {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  z-index: 80;
 }
 
-.zoom-group .btn.btn-icon {
-  border-radius: 0;
-  margin: 0;
-}
-
-.zoom-group .btn.btn-icon:not(:first-child) {
-  border-left-width: 0;
-}
-
-.zoom-group .btn.btn-icon:first-child {
-  border-top-left-radius: var(--radius);
-  border-bottom-left-radius: var(--radius);
-}
-
-.zoom-group .btn.btn-icon:last-child {
-  border-top-right-radius: var(--radius);
-  border-bottom-right-radius: var(--radius);
-}
-
-/* Larger glyph for the zoom +/- buttons so they read clearly. */
-.zoom-group .btn#btn-zoom-in,
-.zoom-group .btn#btn-zoom-out {
-  font-size: 18px;
+.zoom-fab-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: white;
+  color: var(--ft-black);
+  font-size: 20px;
   font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.zoom-group .btn#btn-fit {
-  font-size: 14px;
+.zoom-fab-btn:last-child {
+  border-bottom: none;
 }
+
+.zoom-fab-btn:hover {
+  background: var(--bg);
+}
+
+.zoom-fab-btn:active {
+  background: var(--border);
+}
+
+.zoom-fab-btn:focus-visible {
+  outline: 2px solid var(--ft-red);
+  outline-offset: -2px;
+}
+
+.zoom-fab-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* The fit glyph is busier visually — render slightly smaller so the
+   three buttons read as a coherent set rather than a heavyweight middle. */
+.zoom-fab-btn.zoom-fab-fit {
+  font-size: 16px;
+  color: var(--text-muted);
+}
+.zoom-fab-btn.zoom-fab-fit:hover { color: var(--ft-black); }
 
 .btn-primary {
   background: var(--ft-red);

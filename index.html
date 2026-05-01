@@ -12,11 +12,6 @@
         <button id="btn-add-root" class="btn btn-primary" title="Neuen Wurzelknoten hinzufügen">+ Wurzelknoten</button>
         <button id="btn-undo" class="btn btn-icon" title="Rückgängig (Strg+Z)" aria-label="Rückgängig" disabled>↶</button>
         <button id="btn-redo" class="btn btn-icon" title="Wiederholen (Strg+Y / Strg+Shift+Z)" aria-label="Wiederholen" disabled>↷</button>
-        <span class="zoom-group" role="group" aria-label="Zoom">
-          <button id="btn-zoom-out" class="btn btn-icon" title="Verkleinern" aria-label="Verkleinern">−</button>
-          <button id="btn-fit" class="btn btn-icon" title="An Bildschirm anpassen / zentrieren" aria-label="Zentrieren">⊕</button>
-          <button id="btn-zoom-in" class="btn btn-icon" title="Vergrößern" aria-label="Vergrößern">+</button>
-        </span>
         <button id="btn-expand-all" class="btn" title="Alle ausklappen">Alle aufklappen</button>
         <button id="btn-collapse-all" class="btn" title="Alle einklappen">Alle einklappen</button>
         <button id="btn-layout-mode" class="btn" title="Layout-Modus umschalten">🔀 Auto</button>
@@ -67,6 +62,13 @@
     </section>
 
     <main id="chart" class="chart"></main>
+
+    <!-- Floating zoom + fit cluster, bottom-left, Google-Maps-style. -->
+    <div class="zoom-fab" role="group" aria-label="Zoom-Steuerung">
+      <button id="btn-zoom-in" class="zoom-fab-btn" type="button" title="Vergrößern" aria-label="Vergrößern">+</button>
+      <button id="btn-zoom-out" class="zoom-fab-btn" type="button" title="Verkleinern" aria-label="Verkleinern">−</button>
+      <button id="btn-fit" class="zoom-fab-btn zoom-fab-fit" type="button" title="An Bildschirm anpassen / zentrieren" aria-label="Zentrieren">⊕</button>
+    </div>
 
     <!-- Stats / KPI sidebar — slides in from the right when the
          toolbar's 📊 button is pressed. -->
