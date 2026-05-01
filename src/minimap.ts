@@ -80,8 +80,17 @@ export function createMinimap({ chart, host }) {
   function draw() {
     const state = chart.getChartState?.();
     if (!state) return;
-    const allNodes = state.allNodes ?? [];
-    const visible = allNodes.filter((n) => !n?.data?._virtual);
+    // Only render the *currently visible* slice of the tree. d3-org-chart
+    // hides a collapsed subtree by detaching it from `node.children` (the
+    // ancestors keep it under `node._children`), so traversing the live
+    // root hierarchy automatically skips collapsed nodes — using
+    // `state.allNodes` instead would always render every node, even when
+    // the user has just collapsed a root subtree.
+    const root = state.root;
+    const sourceNodes = root && typeof root.descendants === 'function'
+      ? root.descendants()
+      : (state.allNodes ?? []);
+    const visible = sourceNodes.filter((n) => !n?.data?._virtual);
     ctx.clearRect(0, 0, W, H);
 
     if (!visible.length) {
@@ -149,7 +158,11 @@ export function createMinimap({ chart, host }) {
     const my = ev.clientY - rect.top;
     const { x: lx, y: ly } = projection.toLayout(mx, my);
 
-    const visible = (state.allNodes ?? []).filter((n) => !n?.data?._virtual);
+    const root = state.root;
+    const sourceNodes = root && typeof root.descendants === 'function'
+      ? root.descendants()
+      : (state.allNodes ?? []);
+    const visible = sourceNodes.filter((n) => !n?.data?._virtual);
     if (!visible.length) return;
     let best = visible[0];
     let bestD = Infinity;
