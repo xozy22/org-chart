@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Connected Cards — three rounded-rectangle "cards" with a red top
+  accent stripe, wired by d3-org-chart-style elbow joints. The whole
+  composition sits on a white rounded-square so the logo reads as a
+  self-contained app icon on any background (light, dark, photo,
+  Fortinet-red toolbar, …).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Connected Cards</title>
+
+  <!-- App-icon background: white rounded square -->
+  <rect x="0" y="0" width="256" height="256" rx="48" fill="#FFFFFF" />
+
+  <!-- Connector lines (d3-org-chart's signature elbow shape) -->
+  <g fill="none" stroke="#2A2D33" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 128 88  L 128 112  L 64  112  L 64  140" />
+    <path d="M 128 112 L 192 112  L 192 140" />
+  </g>
+
+  <!-- Root card -->
+  <g>
+    <rect x="92" y="40" width="72" height="48" rx="8"
+          fill="#F6F7F9" stroke="#1A1A1A" stroke-width="4" />
+    <!-- top accent stripe -->
+    <path d="M 92 48 H 164" stroke="#DA291C" stroke-width="8" stroke-linecap="round" />
+    <!-- avatar dot -->
+    <circle cx="108" cy="68" r="6" fill="#DA291C" />
+    <!-- title bars -->
+    <rect x="120" y="62" width="36" height="4" rx="2" fill="#2A2D33" />
+    <rect x="120" y="72" width="24" height="3" rx="1.5" fill="#3A3F47" />
+  </g>
+
+  <!-- Left child card -->
+  <g>
+    <rect x="28" y="140" width="72" height="48" rx="8"
+          fill="#F6F7F9" stroke="#1A1A1A" stroke-width="4" />
+    <path d="M 28 148 H 100" stroke="#2A2D33" stroke-width="6" stroke-linecap="round" />
+    <circle cx="44" cy="168" r="6" fill="#2A2D33" />
+    <rect x="56" y="162" width="36" height="4" rx="2" fill="#2A2D33" />
+    <rect x="56" y="172" width="24" height="3" rx="1.5" fill="#3A3F47" />
+  </g>
+
+  <!-- Right child card -->
+  <g>
+    <rect x="156" y="140" width="72" height="48" rx="8"
+          fill="#F6F7F9" stroke="#1A1A1A" stroke-width="4" />
+    <path d="M 156 148 H 228" stroke="#2A2D33" stroke-width="6" stroke-linecap="round" />
+    <circle cx="172" cy="168" r="6" fill="#2A2D33" />
+    <rect x="184" y="162" width="36" height="4" rx="2" fill="#2A2D33" />
+    <rect x="184" y="172" width="24" height="3" rx="1.5" fill="#3A3F47" />
+  </g>
+</svg>

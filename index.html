@@ -4,10 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Org-Chart Builder</title>
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <header class="toolbar">
+      <!-- Brand mark — logo + wordmark, leftmost -->
+      <div class="toolbar-brand" aria-label="Org-Chart Builder">
+        <img src="/logo.svg" alt="" class="toolbar-brand-logo" />
+        <span class="toolbar-brand-text">ORG·CHART</span>
+      </div>
+
       <!-- Group 1: Workspace switcher (chart navigation) -->
       <div class="toolbar-group">
         <button id="btn-workspaces" class="btn btn-chart-name" title="Charts verwalten" aria-label="Charts verwalten" hidden>🗂 Charts</button>
