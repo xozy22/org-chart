@@ -67,6 +67,42 @@ function collectDocumentCss(): string {
   return css;
 }
 
+/**
+ * Read every CSS custom property defined on the live document's `:root`
+ * (== `<html>`) and emit them as a CSS rule scoped to `svg`. Without this
+ * the rasterised SVG has no `<html>` ancestor, so every `var(--…)` reference
+ * inside foreignObject HTML cards resolves to the empty string and cards
+ * lose their borders, shadows, accent strip and radii.
+ *
+ * We also propagate the body's `font-family` so cards keep their type.
+ */
+function inlineRootCustomProperties(): string {
+  const root = document.documentElement;
+  const body = document.body;
+  const rootStyles = getComputedStyle(root);
+  const bodyStyles = getComputedStyle(body);
+
+  const decls: string[] = [];
+  for (let i = 0; i < rootStyles.length; i++) {
+    const prop = rootStyles.item(i);
+    if (!prop.startsWith('--')) continue;
+    const value = rootStyles.getPropertyValue(prop).trim();
+    if (!value) continue;
+    decls.push(`${prop}: ${value};`);
+  }
+
+  const fontFamily = bodyStyles.fontFamily || rootStyles.fontFamily;
+  if (fontFamily) decls.push(`font-family: ${fontFamily};`);
+  const color = bodyStyles.color;
+  if (color) decls.push(`color: ${color};`);
+
+  if (!decls.length) return '';
+  // Apply on the SVG itself so foreignObject descendants inherit, and on
+  // foreignObject HTML roots as a belt-and-braces measure for renderers
+  // that don't propagate custom properties through the SVG/HTML boundary.
+  return `svg, svg foreignObject > * { ${decls.join(' ')} }\n`;
+}
+
 /* -------------------------------------------------------------------- */
 /*  Flag-icon inlining                                                  */
 /* -------------------------------------------------------------------- */
@@ -157,11 +193,16 @@ async function prepareExportSvg(chart) {
     if (!el.getAttribute('xmlns')) el.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
   });
 
-  // 1. Embed the document CSS so cards keep their styling
+  // 1. Embed the document CSS so cards keep their styling. The
+  //    `inlineRootCustomProperties()` rule re-applies every `--*` custom
+  //    property from the live `:root` onto the SVG, because the rasterised
+  //    SVG has no `<html>` ancestor — without it every var() reference
+  //    inside the foreignObject cards resolves to empty.
   const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
   styleEl.textContent = `
     /* Solid white background covering the whole canvas */
     svg { background: ${BG}; }
+    ${inlineRootCustomProperties()}
     ${collectDocumentCss()}
   `;
   clone.insertBefore(styleEl, clone.firstChild);
