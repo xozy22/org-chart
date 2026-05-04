@@ -10,9 +10,47 @@
   </a>
 </p>
 
-A browser-based organisational chart builder. TypeScript + [d3-org-chart](https://github.com/bumbeishvili/org-chart) for the SPA, a small Express backend for shared multi-chart storage. Ships as **one Docker image, one process, one port** — point a host directory at `/app/data` and you're done.
+A browser-based organisational chart builder. TypeScript + [d3-org-chart](https://github.com/bumbeishvili/org-chart) for the SPA, a small Express backend for shared multi-chart storage and avatar uploads. Ships as **one Docker image, one process, one port** — point a host directory at `/app/data` and you're done.
 
 ![Org-Chart Builder screenshot](docs/screenshot-app.png)
+
+---
+
+## Quick start
+
+```bash
+docker run -d --name org-chart \
+  -p 8080:3000 \
+  -v "$PWD/data":/app/data \
+  ghcr.io/xozy22/org-chart:latest
+
+open http://localhost:8080
+```
+
+That's it — one image, one container, one volume. Frontend SPA, REST API
+and chart storage are all served by the same Node process on port 3000
+inside the container. The host directory at `/app/data` keeps your
+charts and uploaded avatars across container restarts.
+
+### docker-compose
+
+A ready-to-use compose file ships in the repo:
+
+```bash
+docker compose up -d
+# → http://localhost:8080
+```
+
+```yaml
+services:
+  org-chart:
+    image: ghcr.io/xozy22/org-chart:latest
+    ports:
+      - "8080:3000"
+    volumes:
+      - ${ORG_CHART_DATA:-./data}:/app/data
+    restart: unless-stopped
+```
 
 ---
 
@@ -27,6 +65,7 @@ A browser-based organisational chart builder. TypeScript + [d3-org-chart](https:
 | **Tag filter & search** | Free-text search filters by name and tag; tag chips toggle as multi-select filters. |
 | **Optimistic locking** | Every save sends an `If-Match: <etag>` header. Concurrent edits surface a conflict modal: load server, force local, or cancel. |
 | **Per-user view-state** | Free-layout positions and the `auto`/`free` mode are stored per-chart in the browser, so each viewer has their own placement on top of the same shared content. |
+| **Drop-in import** | Copy a `*.json` file into `<data>/charts/` — the backend picks it up at boot and via a live filesystem watcher (chokidar), no restart needed. |
 | **Offline fallback** | If the backend isn't reachable, the app silently falls back to single-chart `localStorage` mode. |
 
 ### Cards & data
@@ -34,9 +73,9 @@ A browser-based organisational chart builder. TypeScript + [d3-org-chart](https:
 | Area | What it does |
 |---|---|
 | **Card content** | Avatar (image or auto-initials), name, title, department badge, email, phone, country flag |
-| **Avatar upload** | Drag a JPG / PNG / GIF / WebP / SVG onto the upload button in the edit modal. Optional 1:1 cropper opens for raster files. The backend then runs every upload through a smart-compression pipeline: resize to fit within 500×500 px (aspect ratio preserved, never upscaled), strip EXIF, re-encode with format-aware compression — opaque PNGs get converted to JPEG (5–10× smaller), transparent PNGs get palette-quantised, JPEGs / WebP / GIF keep their format. SVGs pass through verbatim. A safety net keeps the original buffer if the optimised output would be larger. Defaults are 5 MB upload limit, 500 px longest edge, JPEG quality 85 — overridable via `IMAGE_MAX_BYTES`, `IMAGE_MAX_DIMENSION`, `IMAGE_QUALITY`. |
-| **Avatar viewer** | Click any uploaded avatar on a node to see it at full size in a modal — useful when the 40-px circle is too small to read finer details (e.g. team logos). Esc / backdrop / X / clicking the image again closes it. |
-| **Clickable contacts** | Email = `mailto:` link, phone = `tel:` link. Per-field copy icon on hover; per-card menu and toolbar action either copy the node as plain text **or download an RFC-6350 vCard (`.vcf`)** ready to import into Apple Contacts / Outlook / Google. Multi-select (Ctrl+Click) bundles every selected node into a single `<chart>_vcards_<date>.zip`. |
+| **Avatar upload** | Drag a JPG / PNG / GIF / WebP / SVG onto the upload button in the edit modal. Optional 1:1 cropper opens for raster files. The backend then runs every upload through a smart-compression pipeline: resize to fit within 500×500 px (aspect ratio preserved, never upscaled), strip EXIF, re-encode with format-aware compression — opaque PNGs get converted to JPEG (5–10× smaller), transparent PNGs get palette-quantised, JPEGs / WebP / GIF keep their format. SVGs pass through verbatim. A safety net keeps the original buffer if the optimised output would be larger. |
+| **Avatar viewer** | Click any uploaded avatar on a node to see it at full size in a modal. Esc / backdrop / X / clicking the image again closes it. |
+| **Clickable contacts** | Email = `mailto:` link, phone = `tel:` link. Per-field copy icon on hover. The per-card menu and the toolbar's "Markierte Knoten" submenu copy the selection as plain text **or download an RFC-6350 vCard (`.vcf`)** ready to import into Apple Contacts / Outlook / Google. Multi-select bundles all selected nodes into a single `<chart>_vcards_<date>.zip`. |
 | **Custom fields** | User-defined extras (text / number / date / url / email) with toggleable card visibility |
 | **Multi-root** | Any number of `parentId: null` nodes; each subtree gets a stable colour container with a `ROOT` badge that descendants inherit |
 | **Departments** | Auto-suggest dropdown of every known department + 11-colour palette + custom colour picker, shared by every card in the same department |
@@ -67,8 +106,8 @@ A browser-based organisational chart builder. TypeScript + [d3-org-chart](https:
 | **Undo / redo** | 50-step history with toolbar buttons + `Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`; covers every edit, drag, bulk action and layout-mode toggle |
 | **Country flags** | 59 countries via [`flag-icons`](https://github.com/lipis/flag-icons), datalist autocomplete by name or ISO-2 code |
 | **Image export** | High-quality PNG (2× pixel ratio), self-contained SVG, A4 PDF — every CSS rule and flag image is inlined so the export looks identical to the live view |
-| **JSON / CSV import & export** | v3 envelope with nodes, departments **and** custom-fields schema; legacy v2 + bare-array forms still accepted. Avatar uploads are inlined as `data:` URIs on export and re-hosted on the new backend on import, so a JSON exported on one host imports lossless on another. |
-| **Contact export (vCard)** | Single node → `.vcf` download; multi-select → ZIP bundle of one `.vcf` per node, ready to drag into Apple Contacts, Outlook or Google Contacts. UTF-8 BOM and `text/vcard` MIME type set so Windows mail clients detect the encoding. |
+| **JSON / CSV import & export** | v3 envelope with nodes, departments **and** custom-fields schema; legacy v2 + bare-array forms still accepted. Avatar uploads are inlined as `data:` URIs on export and re-hosted on the new backend on import — a JSON exported on one host imports lossless on another. |
+| **Contact export (vCard)** | Single node → `.vcf` download; multi-select → ZIP bundle of one `.vcf` per node, ready to drag into Apple Contacts, Outlook or Google Contacts. UTF-8 BOM and `text/vcard` MIME set so Windows mail clients detect the encoding. |
 
 ![Edit modal](docs/screenshot-edit-modal.png)
 
@@ -89,47 +128,10 @@ Wheel / pinch on the canvas zooms; click-and-drag on empty space pans.
 
 ---
 
-## Quick start (Docker)
-
-```bash
-docker run -d --name org-chart \
-  -p 8080:3000 \
-  -v "$PWD/data":/app/data \
-  ghcr.io/xozy22/org-chart:latest
-
-open http://localhost:8080
-```
-
-That's it — one image, one container, one volume. Everything (frontend
-SPA + REST API + chart storage) is served by the same Node process on
-port 3000 inside the container.
-
-### docker-compose
-
-A ready-to-use compose file ships in the repo:
-
-```bash
-docker compose up -d
-# → http://localhost:8080
-```
-
-```yaml
-services:
-  org-chart:
-    image: ghcr.io/xozy22/org-chart:latest
-    ports:
-      - "8080:3000"
-    volumes:
-      - ${ORG_CHART_DATA:-./data}:/app/data
-    restart: unless-stopped
-```
-
----
-
 ## Storage & volume mount
 
-The container expects **one directory mounted at `/app/data`**. Inside it
-the backend creates two things:
+The container expects **one directory mounted at `/app/data`**. Inside
+it the backend creates two subtrees:
 
 ```
 /app/data/
@@ -146,9 +148,8 @@ the backend creates two things:
 
 > 💡 **Drop-in import** — any `*.json` file you copy into `<data>/charts/`
 > is auto-imported on startup *and* live while the container runs (file
-> watcher). Filenames that aren't already UUIDs get renamed to the
-> minted UUID; the original filename becomes the chart's display name.
-> See [Drop-in import](#drop-in-import-auto-discover-json-files) below.
+> watcher). Filenames that aren't already UUIDs are renamed to a fresh
+> UUID; the original filename becomes the chart's display name.
 
 The host path is up to you. Pick whichever pattern fits:
 
@@ -213,9 +214,9 @@ You'll see this on first start:
 ```
 
 If `chown` itself fails (read-only mount, SMB/NFS without write access,
-SELinux label mismatch on RHEL/Fedora), the entrypoint logs a warning and
-the API still starts — you'll get `503 Storage volume is not writable`
-on every write request until the host permissions are fixed.
+SELinux label mismatch on RHEL/Fedora), the entrypoint logs a warning
+and the API still starts — you'll get `503 Storage volume is not
+writable` on every write request until the host permissions are fixed.
 
 **Force a specific UID/GID** (skip the auto-chown — useful when you want
 the on-disk files owned by *your* user for editing or backups):
@@ -303,14 +304,14 @@ file with the same name.
 
 The folder is just JSON + image files. Standard tools work:
 
-- **Backup**: `tar -czf data-backup.tgz data/` — includes both `charts/`
-  and `images/`.
+- **Backup**: `tar -czf data-backup.tgz data/` — includes both
+  `charts/` and `images/`.
 - **Restore**: stop the container, `tar -xzf data-backup.tgz`, start
   again. The auto-importer will reconcile any drift between the index
   and the files on disk.
 - **Edit by hand**: stop the container, edit, restart. Live edits to
-  active charts are *not* recommended — the optimistic-lock ETag races a
-  manual write and the first concurrent save from a browser will
+  active charts are *not* recommended — the optimistic-lock ETag races
+  a manual write and the first concurrent save from a browser will
   overwrite your changes.
 
 ### Cross-host portability (JSON + images)
@@ -328,12 +329,14 @@ losing the avatar images:
   `imageUrl` to the fresh local URL. A second toast shows
   `Bilder werden hochgeladen (X / Y)…`.
 
-Sizing:
+Because the backend's smart-compression pipeline already shrinks
+uploads (500 px max edge, opaque PNG → JPEG, transparent PNG →
+palette-quantised), exports stay small:
 
-- Cropped 512×512 JPEG avatars run ~50–80 KB each → ~70 KB after Base64
-  overhead. A 100-node chart with hand-uploaded avatars on every node
-  ends up around **7–10 MB JSON**. Email-friendly, fits any cloud
-  drive.
+- Cropped / compressed avatars typically run ~30–80 KB each → ~50–110 KB
+  after Base64 overhead. A 100-node chart with hand-uploaded avatars
+  on every node ends up around **5–10 MB JSON** — email-friendly,
+  fits any cloud drive.
 - For typical small charts (<20 avatars) the JSON stays under 2 MB.
 - 8 fetches/uploads run in parallel (browser per-origin connection
   limit). Roundtrip on a local backend: **~1–3 s export, ~2–5 s
@@ -346,14 +349,37 @@ from the inlined bytes, just less efficiently.
 ### Default chart for empty installs
 
 `public/sample-data.json` ships inside the image and is loaded the
-*first time* the backend starts and the data dir is empty. Replace it by
-mounting your own file over it:
+*first time* the backend starts and the data dir is empty. Replace it
+by mounting your own file over it:
 
 ```yaml
 volumes:
   - ${ORG_CHART_DATA:-./data}:/app/data
   - ./my-sample.json:/app/public/sample-data.json:ro
 ```
+
+---
+
+## Configuration reference
+
+All knobs are environment variables. Defaults shown in brackets.
+
+| Variable | Effect |
+|---|---|
+| `PORT` *(`3000`)* | TCP port the Node process listens on inside the container |
+| `DATA_DIR` *(`/app/data`)* | Absolute path to the chart-storage directory |
+| `STATIC_DIR` *(`/app/public`)* | Absolute path to the compiled SPA bundle. Set empty / unset to run API-only |
+| `CORS_ORIGIN` *(`*`)* | Comma-separated list of allowed origins, or `*` |
+| `IMAGE_MAX_BYTES` *(`5242880`)* | Max accepted size for avatar uploads (in bytes — default 5 MB) |
+| `IMAGE_MAX_DIMENSION` *(`500`)* | Longest edge in pixels — uploads larger than this are scaled down on the server |
+| `IMAGE_QUALITY` *(`85`)* | JPEG / WebP encode quality (0–100) for resized avatars |
+| `NODE_ENV` *(`production`)* | Standard Node env flag |
+
+In dev only:
+
+| Variable | Effect |
+|---|---|
+| `BACKEND_URL` *(`http://localhost:3000`)* | URL the Vite dev server's `/api` proxy targets |
 
 ---
 
@@ -399,55 +425,36 @@ The build is a 3-stage multi-arch Dockerfile:
 
 1. `frontend-builder` — runs `npm ci && npm run build` against the root `package.json`
 2. `backend-builder` — runs the same against `backend/package.json` and prunes dev deps
-3. `runtime` — Node 20 Alpine + the compiled backend at `/app/dist` + the SPA bundle at `/app/public`
+3. `runtime` — Node 20 Alpine + the compiled backend at `/app/dist` + the SPA bundle at `/app/public` + `su-exec` for the privilege-drop entrypoint
 
 Both `linux/amd64` and `linux/arm64` are published by CI, so the same
 image runs on Apple Silicon, x86 servers and Raspberry Pi 5.
 
 ---
 
-## Configuration reference
-
-All knobs are environment variables. Defaults shown in brackets.
-
-| Variable | Effect |
-|---|---|
-| `PORT` *(`3000`)* | TCP port the Node process listens on inside the container |
-| `DATA_DIR` *(`/app/data`)* | Absolute path to the chart-storage directory |
-| `STATIC_DIR` *(`/app/public`)* | Absolute path to the compiled SPA bundle. Set empty / unset to run API-only |
-| `CORS_ORIGIN` *(`*`)* | Comma-separated list of allowed origins, or `*` |
-| `IMAGE_MAX_BYTES` *(`5242880`)* | Max accepted size for avatar uploads (in bytes — default 5 MB) |
-| `IMAGE_MAX_DIMENSION` *(`500`)* | Longest edge in pixels — uploads larger than this are scaled down on the server |
-| `IMAGE_QUALITY` *(`85`)* | JPEG / WebP encode quality (0–100) for resized avatars |
-| `NODE_ENV` *(`production`)* | Standard Node env flag |
-
-In dev only:
-
-| Variable | Effect |
-|---|---|
-| `BACKEND_URL` *(`http://localhost:3000`)* | URL the Vite dev server's `/api` proxy targets |
-
----
-
 ## REST API
 
-The server exposes a single resource. All bodies are JSON.
+The server exposes two resources. All bodies are JSON.
 
 | Method | Path | Notes |
 |---|---|---|
-| `GET`    | `/api/charts`     | Index — every chart's metadata (no payload) |
-| `POST`   | `/api/charts`     | Body `{name, tags?, payload?}` → 201 with new entry |
-| `GET`    | `/api/charts/:id` | Body `{entry, payload}` + `ETag` header |
-| `PUT`    | `/api/charts/:id` | `If-Match: <etag>` required → 200 or 412 (conflict) |
-| `PATCH`  | `/api/charts/:id` | Body `{name?, tags?, default?}` |
-| `DELETE` | `/api/charts/:id` | Auto-promotes oldest as new default if needed; surfaces it via `X-New-Default` header |
-| `POST`   | `/api/images`             | Multipart form with field `image` → 201 + `{ url, bytes, type }`. Stores under `<data>/images/<uuid>.<ext>`. |
-| `GET`    | `/api/images/:filename`   | Serves the uploaded image with 30-day cache headers |
-| `GET`    | `/api/healthz`            | Liveness probe |
+| `GET`    | `/api/charts`           | Index — every chart's metadata (no payload) |
+| `POST`   | `/api/charts`           | Body `{name, tags?, payload?}` → 201 with new entry |
+| `GET`    | `/api/charts/:id`       | Body `{entry, payload}` + `ETag` header |
+| `PUT`    | `/api/charts/:id`       | `If-Match: <etag>` required → 200 or 412 (conflict) |
+| `PATCH`  | `/api/charts/:id`       | Body `{name?, tags?, default?}` |
+| `DELETE` | `/api/charts/:id`       | Auto-promotes oldest as new default if needed; surfaces it via `X-New-Default` header |
+| `POST`   | `/api/images`           | Multipart form with field `image` → 201 + `{ url, bytes, originalBytes, type, resized }`. Stores under `<data>/images/<uuid>.<ext>` after compression. |
+| `GET`    | `/api/images/:filename` | Serves the uploaded image with 30-day immutable cache headers |
+| `GET`    | `/api/healthz`          | Liveness probe |
 
 ETags are 7-char SHA-1 prefixes over the canonical payload — clients
-hold the value from the last `GET`/`PUT` and round-trip it as `If-Match`
-for optimistic locking.
+hold the value from the last `GET`/`PUT` and round-trip it as
+`If-Match` for optimistic locking.
+
+Filesystem-level errors (`EACCES` / `EPERM` / `EROFS`) are translated
+to HTTP 503 with an actionable hint, so a misconfigured volume mount
+shows up as a clean response instead of a process crash.
 
 ---
 
@@ -492,17 +499,22 @@ are allowed; `parentId` of a root node is left blank.
 ```
 .
 ├── Dockerfile                 # all-in-one 3-stage build
+├── docker-entrypoint.sh       # chown /app/data, drop to `app` user, exec node
 ├── docker-compose.yml         # one service, one port, one volume
-├── nginx.conf                 # ── removed — Express now serves static files
 ├── .github/workflows/         # CI: build + push the single image
-├── public/sample-data.json    # demo dataset (loaded on first start)
+├── public/
+│   ├── logo.svg               # toolbar logo + favicon
+│   └── sample-data.json       # demo dataset (loaded on first start)
 ├── backend/                   # Node + Express server
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── src/
 │       ├── server.ts          # bootstrap: REST + static SPA + SPA fallback
-│       ├── routes/charts.ts   # REST endpoints
-│       ├── storage.ts         # file-based store with ETag + mutex
+│       ├── routes/
+│       │   ├── charts.ts      # CRUD + optimistic-lock endpoints
+│       │   └── images.ts      # multipart upload + sharp compression + serve
+│       ├── storage.ts         # file-based store with ETag + mutex + reconcile
+│       ├── autoImport.ts      # chokidar watcher for drop-in JSON imports
 │       └── types.ts           # ChartIndexEntry, ChartPayload
 └── src/                       # frontend SPA
     ├── main.ts                # bootstrap, toolbar wiring, API sync, toasts
@@ -513,7 +525,7 @@ are allowed; `parentId` of a root node is left blank.
     ├── store.ts               # state + localStorage + subscribers
     ├── history.ts             # 50-step undo/redo stack
     ├── types.ts               # OrgNode, CustomField, ChartIndexEntry, …
-    ├── crud.ts                # add/edit/delete modal
+    ├── crud.ts                # add/edit/delete modal + image upload UI
     ├── customFields.ts        # custom-field schema editor
     ├── filters.ts             # search + filter dropdowns + dimming
     ├── selection.ts           # multi-select state + visual sync
@@ -521,8 +533,9 @@ are allowed; `parentId` of a root node is left blank.
     ├── minimap.ts             # bottom-right canvas overview
     ├── stats.ts               # aggregations (counts, depth, completeness)
     ├── exporter.ts            # PNG / SVG / PDF export with inlined CSS
-    ├── io.ts                  # JSON / CSV import & export
-    ├── clipboard.ts           # copy-to-clipboard + vCard formatter
+    ├── io.ts                  # JSON / CSV import & export with image inlining
+    ├── imageCrop.ts           # CropperJS modal wrapper
+    ├── clipboard.ts           # copy-to-clipboard + vCard formatter + ZIP bundler
     ├── countries.ts           # ISO-3166 list + name resolver
     ├── departments.ts         # hash-color helper + WCAG text colour
     └── styles.css             # Fortinet-inspired theme
@@ -532,8 +545,8 @@ are allowed; `parentId` of a root node is left blank.
 
 ## Continuous integration
 
-`.github/workflows/docker.yml` builds and pushes the image on every push
-to `main` and on every tag matching `v*.*.*`:
+`.github/workflows/docker.yml` builds and pushes the image on every
+push to `main` and on every tag matching `v*.*.*`:
 
 | Trigger | Tags |
 |---|---|
@@ -542,23 +555,9 @@ to `main` and on every tag matching `v*.*.*`:
 | Pull request | image is **built but not pushed** (cache stays warm) |
 
 The image lands at `ghcr.io/xozy22/org-chart` and is built for
-`linux/amd64` and `linux/arm64`. To pull it without authentication, set
-the GHCR package visibility to *Public* once at
+`linux/amd64` and `linux/arm64`. To pull it without authentication,
+set the GHCR package visibility to *Public* once at
 <https://github.com/xozy22?tab=packages>.
-
----
-
-## Migrating from the two-container setup
-
-If you ran an earlier version with `org-chart-frontend` + `org-chart-backend`:
-
-1. Pull the new image: `docker compose pull` (or `docker pull ghcr.io/xozy22/org-chart:latest`).
-2. Replace your old `docker-compose.yml` with the [single-service version](#docker-compose).
-3. **Your `./data` directory works as-is** — same JSON layout, same
-   ETag scheme. No migration step needed.
-4. The legacy `ghcr.io/xozy22/org-chart-backend` image is no longer
-   published. If you have downstream automation pinning it, switch to
-   the unified `ghcr.io/xozy22/org-chart` image.
 
 ---
 
