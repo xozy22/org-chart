@@ -263,7 +263,7 @@
             <span class="image-field">
               <span class="image-preview" id="image-preview" aria-hidden="true"></span>
               <span class="image-controls">
-                <input name="imageUrl" type="url" placeholder="URL oder Datei hochladen…" autocomplete="off" />
+                <input name="imageUrl" type="text" placeholder="URL oder Datei hochladen…" autocomplete="off" inputmode="url" />
                 <button type="button" id="image-upload-btn" class="btn btn-icon" title="Bild von Festplatte hochladen" aria-label="Bild hochladen">📁</button>
                 <button type="button" id="image-clear-btn" class="btn btn-icon" title="Bild entfernen" aria-label="Bild entfernen" hidden>✕</button>
               </span>
@@ -340,6 +340,39 @@
           <button class="modal-close" data-close aria-label="Schließen">×</button>
         </header>
         <div id="conflict-body" class="modal-body"></div>
+      </div>
+    </div>
+
+    <!-- Image viewer — shown when a node's avatar image is clicked. -->
+    <div id="image-viewer-modal" class="modal image-viewer-modal" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="image-viewer-frame">
+        <button class="modal-close image-viewer-close" data-close aria-label="Schließen">×</button>
+        <img id="image-viewer-img" alt="" />
+        <div id="image-viewer-caption" class="image-viewer-caption"></div>
+      </div>
+    </div>
+
+    <!-- Image cropper — shown after a file is picked in the edit modal. -->
+    <div id="image-crop-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-dialog modal-dialog--wide">
+        <header class="modal-header">
+          <h2>Bild zuschneiden</h2>
+          <button class="modal-close" data-close aria-label="Schließen">×</button>
+        </header>
+        <div class="modal-body">
+          <p class="modal-hint">Ziehe die Auswahl auf den gewünschten Ausschnitt — die Avatare werden quadratisch (1:1) und rund angezeigt. Mit dem Mausrad kannst du zoomen.</p>
+          <div class="image-crop-stage">
+            <img id="image-crop-target" alt="" />
+          </div>
+        </div>
+        <footer class="modal-footer">
+          <button type="button" id="image-crop-cancel" class="btn">Abbrechen</button>
+          <span class="spacer"></span>
+          <button type="button" id="image-crop-skip" class="btn">Ohne Zuschnitt verwenden</button>
+          <button type="button" id="image-crop-ok" class="btn btn-primary">Zuschneiden &amp; übernehmen</button>
+        </footer>
       </div>
     </div>
 

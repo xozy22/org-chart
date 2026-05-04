@@ -58,8 +58,72 @@ function zoomBy(factor: number) {
   svg.transition().duration(220).call(zoomBehavior.scaleBy, factor);
 }
 
+/**
+ * Snapshot which nodes are currently expanded so a re-render can restore
+ * the same view.
+ *
+ * Subtle d3-org-chart detail (see onButtonClick in d3-org-chart.js): when
+ * a parent's "+N" pill is clicked, the library walks its newly-revealed
+ * CHILDREN and sets `data._expanded = true` on each of them — the
+ * expanded flag lives on the visible nodes, NOT on the parent that was
+ * clicked. So we capture every node whose own `_expanded` is currently
+ * true and re-set the flag on the matching items in the new data array.
+ */
+function snapshotExpandedIds(): Set<string> {
+  const ids = new Set<string>();
+  try {
+    const state = chart?.getChartState?.();
+    const all = state?.allNodes ?? [];
+    for (const node of all) {
+      if (node?.data?._expanded === true && node.data?.id != null) {
+        ids.add(String(node.data.id));
+      }
+    }
+  } catch {
+    /* chart not initialised yet — nothing to preserve */
+  }
+  return ids;
+}
+
 function rerender() {
-  chart.data(withVirtualRoot(store.get())).render();
+  // Without preserving expansion, every save/edit collapses everything
+  // except the root because `chart.data(...).render()` resets d3-org-chart's
+  // internal hierarchy state. Two-step preservation:
+  //
+  //   1. Inject `_expanded: true` directly into the data nodes that were
+  //      expanded — d3-org-chart respects this flag during initial render
+  //      so the tree comes up already expanded (no flicker).
+  //   2. As a safety net (in case data() reset wipes the flag), re-apply
+  //      via setExpanded + render after one rAF tick.
+  const expandedIds = snapshotExpandedIds();
+
+  const data = withVirtualRoot(store.get()).map((n: any) => {
+    if (n._virtual || expandedIds.has(String(n.id))) {
+      return { ...n, _expanded: true };
+    }
+    return n;
+  });
+
+  chart.data(data).render();
+
+  // Belt-and-braces: if the data-injection didn't take effect (race with
+  // d3-org-chart's first-render reset), explicitly re-expand after the
+  // initial render finishes.
+  if (expandedIds.size > 0) {
+    requestAnimationFrame(() => {
+      let touched = false;
+      for (const id of expandedIds) {
+        try {
+          chart.setExpanded(id, true);
+          touched = true;
+        } catch {
+          /* node was removed in this edit — fine */
+        }
+      }
+      if (touched) chart.render();
+    });
+  }
+
   // Keep filter dropdowns in sync with the latest data so new departments,
   // countries or roots appear immediately as filter options.
   filtersRef?.refreshDropdowns();
@@ -514,7 +578,9 @@ function bindToolbar() {
     const file = jsonInput.files?.[0];
     if (!file) return;
     try {
-      const { nodes, departments, customFields } = await importJson(file);
+      const { nodes, departments, customFields } = await importJson(file, (done, total) => {
+        toast(`Bilder werden hochgeladen (${done} / ${total})…`, 'info', 60000);
+      });
       store.set(nodes);
       store.departments = departments || {};
       if (customFields && customFields.length) store.customFields = customFields;
@@ -527,9 +593,21 @@ function bindToolbar() {
       jsonInput.value = '';
     }
   });
-  document.getElementById('btn-export-json').addEventListener('click', () => {
-    exportJson(store.get(), store.departments, store.customFields, activeChartName);
-    toast('JSON heruntergeladen');
+  document.getElementById('btn-export-json').addEventListener('click', async () => {
+    try {
+      await exportJson(
+        store.get(),
+        store.departments,
+        store.customFields,
+        activeChartName,
+        (done, total) => {
+          toast(`Bilder werden inline-kodiert (${done} / ${total})…`, 'info', 60000);
+        },
+      );
+      toast('JSON heruntergeladen');
+    } catch (err: any) {
+      toast('Export fehlgeschlagen: ' + (err?.message ?? err), 'error', 4000);
+    }
   });
 
   // CSV
@@ -602,6 +680,18 @@ function bindNodeActionDelegation() {
     if (!target) return;
     ev.stopPropagation();
     const action = target.getAttribute('data-action');
+
+    // Avatar click → open the larger-image viewer modal.
+    if (action === 'view-image') {
+      ev.preventDefault();
+      const src = target.getAttribute('data-image-src') || (target as HTMLImageElement).src;
+      const card = target.closest('.node-card[data-id]');
+      const nodeId = card?.getAttribute('data-id') || null;
+      const node = nodeId ? store.byId(nodeId) : null;
+      const caption = node ? [node.name, node.title].filter(Boolean).join(' — ') : '';
+      openImageViewer(src, caption);
+      return;
+    }
 
     // Per-field copy (email / phone / custom-email): copy the value, toast.
     if (action === 'copy-field') {
@@ -718,6 +808,49 @@ function setupCardCopyPopover(): void {
   // Close when the chart re-renders or scrolls.
   window.addEventListener('resize', closeCardCopyPopover);
   window.addEventListener('scroll', closeCardCopyPopover, true);
+}
+
+/* -------------------------------------------------------------------- */
+/*  Image viewer modal                                                   */
+/* -------------------------------------------------------------------- */
+
+function openImageViewer(src: string, caption?: string): void {
+  const modal = document.getElementById('image-viewer-modal') as HTMLElement | null;
+  const img = document.getElementById('image-viewer-img') as HTMLImageElement | null;
+  const cap = document.getElementById('image-viewer-caption') as HTMLElement | null;
+  if (!modal || !img || !src) return;
+  img.src = src;
+  img.alt = caption || '';
+  if (cap) {
+    cap.textContent = caption || '';
+    cap.hidden = !caption;
+  }
+  modal.hidden = false;
+}
+
+function closeImageViewer(): void {
+  const modal = document.getElementById('image-viewer-modal') as HTMLElement | null;
+  const img = document.getElementById('image-viewer-img') as HTMLImageElement | null;
+  if (!modal) return;
+  modal.hidden = true;
+  // Drop the src so a future open of a different image doesn't briefly
+  // flash the previous one before the new one loads.
+  if (img) img.src = '';
+}
+
+function setupImageViewer(): void {
+  const modal = document.getElementById('image-viewer-modal') as HTMLElement | null;
+  if (!modal) return;
+  // Backdrop / X / clicking the image itself all close the modal.
+  modal.addEventListener('click', (ev) => {
+    const t = ev.target as Element | null;
+    if (t && (t.hasAttribute('data-close') || t.tagName === 'IMG')) {
+      closeImageViewer();
+    }
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && !modal.hidden) closeImageViewer();
+  });
 }
 
 function syncHistoryButtons(status: { canUndo: boolean; canRedo: boolean }) {
@@ -1036,6 +1169,7 @@ async function bootstrap() {
   bindToolbar();
   setupToolbarMenus();
   setupCardCopyPopover();
+  setupImageViewer();
   bindNodeActionDelegation();
   bindKeyboardShortcuts();
   bindBulkBar();

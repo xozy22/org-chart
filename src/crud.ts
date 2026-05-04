@@ -1,6 +1,7 @@
 import { COUNTRIES, countryCode, countryName } from './countries.js';
 import { defaultDepartmentColor } from './departments.js';
 import { computeNewNodePosition } from './freeLayout.js';
+import { openCropper } from './imageCrop.js';
 
 const FIELDS = ['id', 'parentId', 'name', 'title', 'department', 'email', 'phone', 'imageUrl', 'country'];
 
@@ -141,12 +142,37 @@ export function setupModal({ store, onChange }: { store: any; onChange?: () => v
     const file = imageUploadInput.files?.[0];
     if (!file) return;
     if (!imageUrlInput || !imageUploadBtn) return;
+
+    // Step 1: let the user pick a square crop (or keep the original).
+    let payload: Blob;
+    let filename = file.name;
+    try {
+      const result = await openCropper(file);
+      if (result === null) {
+        // user cancelled
+        imageUploadInput.value = '';
+        return;
+      }
+      if (result === 'original') {
+        payload = file;
+      } else {
+        payload = result;
+        // Cropped JPEGs always end in .jpg; rename for clarity in storage.
+        const stem = file.name.replace(/\.[^.]+$/, '');
+        filename = `${stem}-crop.jpg`;
+      }
+    } catch (err) {
+      console.error('Cropper failed:', err);
+      payload = file; // fall back: upload as-is
+    }
+
+    // Step 2: upload the chosen blob.
     const originalLabel = imageUploadBtn.textContent;
     imageUploadBtn.disabled = true;
     imageUploadBtn.textContent = '⏳';
     try {
       const fd = new FormData();
-      fd.append('image', file);
+      fd.append('image', payload, filename);
       const res = await fetch('/api/images', { method: 'POST', body: fd });
       if (!res.ok) {
         const body: any = await res.json().catch(() => ({}));
@@ -157,7 +183,6 @@ export function setupModal({ store, onChange }: { store: any; onChange?: () => v
       syncImagePreview();
     } catch (err) {
       const msg = (err as Error)?.message || String(err);
-      // Use the global toast helper if present, else alert as a last resort.
       const toastEl = document.getElementById('toast') as HTMLElement | null;
       if (toastEl) {
         toastEl.textContent = `Bild-Upload: ${msg}`;

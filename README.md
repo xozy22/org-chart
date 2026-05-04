@@ -34,7 +34,8 @@ A browser-based organisational chart builder. TypeScript + [d3-org-chart](https:
 | Area | What it does |
 |---|---|
 | **Card content** | Avatar (image or auto-initials), name, title, department badge, email, phone, country flag |
-| **Avatar upload** | Drag a JPG / PNG / GIF / WebP / SVG onto the upload button in the edit modal — the file is stored on the server under `<data>/images/<uuid>.<ext>` and the node's `imageUrl` is set to `/api/images/<uuid>.<ext>`. Pasting an external URL still works. Max 5 MB per image (override via `IMAGE_MAX_BYTES` env var). |
+| **Avatar upload** | Drag a JPG / PNG / GIF / WebP / SVG onto the upload button in the edit modal. Optional 1:1 cropper opens for raster files. The backend then runs every upload through a smart-compression pipeline: resize to fit within 500×500 px (aspect ratio preserved, never upscaled), strip EXIF, re-encode with format-aware compression — opaque PNGs get converted to JPEG (5–10× smaller), transparent PNGs get palette-quantised, JPEGs / WebP / GIF keep their format. SVGs pass through verbatim. A safety net keeps the original buffer if the optimised output would be larger. Defaults are 5 MB upload limit, 500 px longest edge, JPEG quality 85 — overridable via `IMAGE_MAX_BYTES`, `IMAGE_MAX_DIMENSION`, `IMAGE_QUALITY`. |
+| **Avatar viewer** | Click any uploaded avatar on a node to see it at full size in a modal — useful when the 40-px circle is too small to read finer details (e.g. team logos). Esc / backdrop / X / clicking the image again closes it. |
 | **Clickable contacts** | Email = `mailto:` link, phone = `tel:` link. Per-field copy icon on hover; per-card menu and toolbar action either copy the node as plain text **or download an RFC-6350 vCard (`.vcf`)** ready to import into Apple Contacts / Outlook / Google. Multi-select (Ctrl+Click) bundles every selected node into a single `<chart>_vcards_<date>.zip`. |
 | **Custom fields** | User-defined extras (text / number / date / url / email) with toggleable card visibility |
 | **Multi-root** | Any number of `parentId: null` nodes; each subtree gets a stable colour container with a `ROOT` badge that descendants inherit |
@@ -66,7 +67,7 @@ A browser-based organisational chart builder. TypeScript + [d3-org-chart](https:
 | **Undo / redo** | 50-step history with toolbar buttons + `Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`; covers every edit, drag, bulk action and layout-mode toggle |
 | **Country flags** | 59 countries via [`flag-icons`](https://github.com/lipis/flag-icons), datalist autocomplete by name or ISO-2 code |
 | **Image export** | High-quality PNG (2× pixel ratio), self-contained SVG, A4 PDF — every CSS rule and flag image is inlined so the export looks identical to the live view |
-| **JSON / CSV import & export** | v3 envelope with nodes, departments **and** custom-fields schema; legacy v2 + bare-array forms still accepted |
+| **JSON / CSV import & export** | v3 envelope with nodes, departments **and** custom-fields schema; legacy v2 + bare-array forms still accepted. Avatar uploads are inlined as `data:` URIs on export and re-hosted on the new backend on import, so a JSON exported on one host imports lossless on another. |
 | **Contact export (vCard)** | Single node → `.vcf` download; multi-select → ZIP bundle of one `.vcf` per node, ready to drag into Apple Contacts, Outlook or Google Contacts. UTF-8 BOM and `text/vcard` MIME type set so Windows mail clients detect the encoding. |
 
 ![Edit modal](docs/screenshot-edit-modal.png)
@@ -300,16 +301,47 @@ file with the same name.
 
 ### Backup & restore
 
-The folder is just JSON. Standard tools work:
+The folder is just JSON + image files. Standard tools work:
 
-- **Backup**: `tar -czf charts-backup.tgz data/`
-- **Restore**: stop the container, `tar -xzf charts-backup.tgz`, start
+- **Backup**: `tar -czf data-backup.tgz data/` — includes both `charts/`
+  and `images/`.
+- **Restore**: stop the container, `tar -xzf data-backup.tgz`, start
   again. The auto-importer will reconcile any drift between the index
   and the files on disk.
 - **Edit by hand**: stop the container, edit, restart. Live edits to
   active charts are *not* recommended — the optimistic-lock ETag races a
   manual write and the first concurrent save from a browser will
   overwrite your changes.
+
+### Cross-host portability (JSON + images)
+
+The toolbar's **Datei → JSON exportieren** produces a single, fully
+self-contained file you can move to a different deployment without
+losing the avatar images:
+
+- **On export**, every uploaded avatar (URLs starting with
+  `/api/images/…`) is fetched from the local backend and inlined as a
+  `data:` URI in the JSON. External `https://…` images are left as-is.
+  A toast shows progress (`Bilder werden inline-kodiert (X / Y)…`).
+- **On import**, the new host detects each `data:` URI, POSTs it back
+  to its own `/api/images` endpoint, and rewrites the node's
+  `imageUrl` to the fresh local URL. A second toast shows
+  `Bilder werden hochgeladen (X / Y)…`.
+
+Sizing:
+
+- Cropped 512×512 JPEG avatars run ~50–80 KB each → ~70 KB after Base64
+  overhead. A 100-node chart with hand-uploaded avatars on every node
+  ends up around **7–10 MB JSON**. Email-friendly, fits any cloud
+  drive.
+- For typical small charts (<20 avatars) the JSON stays under 2 MB.
+- 8 fetches/uploads run in parallel (browser per-origin connection
+  limit). Roundtrip on a local backend: **~1–3 s export, ~2–5 s
+  import** for 100 images.
+
+If a re-host POST fails on import (e.g. backend offline), the data URI
+is kept as the `imageUrl` — the avatar still renders in the browser
+from the inlined bytes, just less efficiently.
 
 ### Default chart for empty installs
 
@@ -385,6 +417,8 @@ All knobs are environment variables. Defaults shown in brackets.
 | `STATIC_DIR` *(`/app/public`)* | Absolute path to the compiled SPA bundle. Set empty / unset to run API-only |
 | `CORS_ORIGIN` *(`*`)* | Comma-separated list of allowed origins, or `*` |
 | `IMAGE_MAX_BYTES` *(`5242880`)* | Max accepted size for avatar uploads (in bytes — default 5 MB) |
+| `IMAGE_MAX_DIMENSION` *(`500`)* | Longest edge in pixels — uploads larger than this are scaled down on the server |
+| `IMAGE_QUALITY` *(`85`)* | JPEG / WebP encode quality (0–100) for resized avatars |
 | `NODE_ENV` *(`production`)* | Standard Node env flag |
 
 In dev only:

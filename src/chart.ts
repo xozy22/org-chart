@@ -215,7 +215,7 @@ function renderNodeCard(d) {
     : '';
 
   const avatar = imageUrl
-    ? `<img class="node-avatar" src="${imageUrl}" alt="" referrerpolicy="no-referrer" crossorigin="anonymous" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'node-avatar node-avatar--initials',textContent:'${escapeHtml(initials(data.name))}'}))" />`
+    ? `<img class="node-avatar node-avatar--clickable" src="${imageUrl}" alt="${escapeHtml(data.name || '')}" data-action="view-image" data-image-src="${imageUrl}" title="Bild vergrößern" referrerpolicy="no-referrer" crossorigin="anonymous" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'node-avatar node-avatar--initials',textContent:'${escapeHtml(initials(data.name))}'}))" />`
     : `<div class="node-avatar node-avatar--initials">${escapeHtml(initials(data.name))}</div>`;
 
   // Subtree colouring:
