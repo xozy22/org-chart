@@ -185,15 +185,25 @@ services:
 
 ### File ownership
 
-The container runs as the non-root `app` user. If the host directory is
-owned by a different UID you'll see `EACCES` errors on the first save.
-Either open it up:
+The container starts as **root** so the entrypoint can `chown` the
+mounted data directory to the in-container `app` user, **then drops
+privileges before running Node**. That means a plain
+`docker run -v /any/host/path:/app/data …` Just Works™ regardless of
+how the host directory is owned.
 
-```bash
-sudo chmod -R a+rwX /srv/org-chart/data
+You'll see this on first start:
+
+```
+[entrypoint] adjusting ownership of /app/data (was 1000:1000 → 100:101)
 ```
 
-…or run with your host UID/GID:
+If `chown` itself fails (read-only mount, SMB/NFS without write access,
+SELinux label mismatch on RHEL/Fedora), the entrypoint logs a warning and
+the API still starts — you'll get `503 Storage volume is not writable`
+on every write request until the host permissions are fixed.
+
+**Force a specific UID/GID** (skip the auto-chown — useful when you want
+the on-disk files owned by *your* user for editing or backups):
 
 ```yaml
 services:
@@ -201,7 +211,19 @@ services:
     user: "${UID:-1000}:${GID:-1000}"
 ```
 
-…and `chown -R 1000:1000 /srv/org-chart/data`.
+In that case make sure your host directory matches:
+
+```bash
+chown -R "$(id -u):$(id -g)" /srv/org-chart/data
+```
+
+**SELinux** (RHEL / Fedora / CentOS): add the `:Z` mount flag so the
+volume gets relabeled for container access:
+
+```yaml
+volumes:
+  - /srv/org-chart/data:/app/data:Z
+```
 
 ### Drop-in import (auto-discover JSON files)
 

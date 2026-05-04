@@ -983,19 +983,10 @@ async function bootstrap() {
 
   // Workspaces — only enabled when a backend is reachable.
   if (store.apiAvailable) {
-    const wsBtn = document.getElementById('btn-workspaces') as HTMLButtonElement | null;
-    if (wsBtn) {
-      wsBtn.hidden = false;
-      // Show the active chart's name on the button so the user always
-      // knows which chart they're editing.
-      try {
-        const list = await api.listCharts();
-        const active = list.find((c) => c.id === store.currentChartId);
-        if (active) updateCurrentChartLabel(active.name);
-      } catch {
-        /* ignore */
-      }
-    }
+    // IMPORTANT — the click handler MUST be bound before the button becomes
+    // visible. Earlier we awaited `api.listCharts()` between making the
+    // button visible and calling setupWorkspaces, which left a race window
+    // (50–500 ms on slow networks) where a quick click would be dropped.
     workspaces = setupWorkspaces({
       store,
       onLoadChart: loadChartIntoStore,
@@ -1012,6 +1003,22 @@ async function bootstrap() {
     });
     // Wire the debounced API sync into store.save().
     store._apiSync = debouncedApiSync;
+
+    // Now safe to reveal the button.
+    const wsBtn = document.getElementById('btn-workspaces') as HTMLButtonElement | null;
+    if (wsBtn) {
+      wsBtn.hidden = false;
+      // Show the active chart's name on the button (best-effort, async).
+      api
+        .listCharts()
+        .then((list) => {
+          const active = list.find((c) => c.id === store.currentChartId);
+          if (active) updateCurrentChartLabel(active.name);
+        })
+        .catch(() => {
+          /* ignore — label stays as "🗂 Charts" */
+        });
+    }
   } else {
     // Backend not reachable — leave the chart-management button hidden,
     // but tell the user once on startup so they know they're offline.

@@ -102,6 +102,9 @@ app.listen(PORT, async () => {
 
   // Auto-import: pick up any *.json files the user has dropped into the
   // chart directory before the server started. Then watch for live changes.
+  // Both phases are wrapped in try/catch so a permission glitch on the
+  // bind-mount doesn't take down the API — the user just sees a warning
+  // and the workspace UI still works (read-only until permissions are fixed).
   try {
     const result = await reconcileFromDisk();
     if (result.imported.length) {
@@ -120,6 +123,26 @@ app.listen(PORT, async () => {
     }
   } catch (err) {
     console.error('[auto-import] boot scan failed:', err);
+    if ((err as NodeJS.ErrnoException)?.code === 'EACCES') {
+      console.error(
+        '[auto-import] hint: the data volume is not writable by the in-container `app` user. ' +
+          'Fix on the host: `chmod -R a+rwX <data-dir>` or run with `--user $(id -u):$(id -g)`.',
+      );
+    }
   }
-  startAutoImportWatcher();
+  try {
+    startAutoImportWatcher();
+  } catch (err) {
+    console.warn('[auto-import] watcher failed to start:', err);
+  }
+});
+
+// Last-resort: if anything escapes our try/catches the server should keep
+// serving the API rather than crash, so the workspace UI and JSON exports
+// still work even when the volume is broken.
+process.on('uncaughtException', (err) => {
+  console.error('[uncaught]', err);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('[unhandled-rejection]', err);
 });

@@ -10,7 +10,7 @@
  */
 
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import {
   listCharts,
@@ -22,103 +22,157 @@ import {
 } from '../storage.js';
 import type { ChartPayload } from '../types.js';
 
+/**
+ * Tiny async-handler wrapper. Express 4 doesn't await route handlers, so a
+ * thrown error from `await storage.foo()` would otherwise become an
+ * unhandled promise rejection at the process level (and on EACCES would
+ * still be caught by our process-level handler, but with a less helpful
+ * 500 instead of the proper error path). This forwards every async
+ * rejection to Express's error middleware so the user gets a real HTTP
+ * response and the server keeps running.
+ */
+function asyncRoute(
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>,
+): RequestHandler {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch((err) => {
+      // Translate filesystem permission errors to a 503 — the API is
+      // healthy but the data volume is misconfigured.
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') {
+        if (!res.headersSent) {
+          res.status(503).json({
+            error: 'Storage volume is not writable',
+            code,
+            hint:
+              'The container cannot write to the data directory. Fix the host directory permissions ' +
+              '(chmod -R a+rwX <data-dir>) or run with --user $(id -u):$(id -g).',
+          });
+        }
+        console.error('[storage] EACCES on write — see hint above:', err);
+        return;
+      }
+      next(err);
+    });
+  };
+}
+
 export const chartsRouter: Router = Router();
 
 /* --------- List ------------------------------------------------------- */
-chartsRouter.get('/charts', async (_req: Request, res: Response) => {
-  const items = await listCharts();
-  res.json({ charts: items });
-});
+chartsRouter.get(
+  '/charts',
+  asyncRoute(async (_req: Request, res: Response) => {
+    const items = await listCharts();
+    res.json({ charts: items });
+  }),
+);
 
 /* --------- Create ----------------------------------------------------- */
-chartsRouter.post('/charts', async (req: Request, res: Response) => {
-  const body = req.body ?? {};
-  const name = typeof body.name === 'string' ? body.name : '';
-  if (!name.trim()) {
-    res.status(400).json({ error: 'Name is required' });
-    return;
-  }
-  const entry = await createChart({
-    name,
-    tags: Array.isArray(body.tags) ? body.tags : [],
-    payload: typeof body.payload === 'object' && body.payload !== null
-      ? body.payload
-      : undefined,
-  });
-  res.status(201).set('ETag', entry.etag).json(entry);
-});
+chartsRouter.post(
+  '/charts',
+  asyncRoute(async (req: Request, res: Response) => {
+    const body = req.body ?? {};
+    const name = typeof body.name === 'string' ? body.name : '';
+    if (!name.trim()) {
+      res.status(400).json({ error: 'Name is required' });
+      return;
+    }
+    const entry = await createChart({
+      name,
+      tags: Array.isArray(body.tags) ? body.tags : [],
+      payload:
+        typeof body.payload === 'object' && body.payload !== null
+          ? body.payload
+          : undefined,
+    });
+    res.status(201).set('ETag', entry.etag).json(entry);
+  }),
+);
 
 /* --------- Get one ---------------------------------------------------- */
-chartsRouter.get('/charts/:id', async (req: Request, res: Response) => {
-  const result = await getChart(req.params.id);
-  if (!result) {
-    res.status(404).json({ error: 'Chart not found' });
-    return;
-  }
-  res
-    .set('ETag', result.entry.etag)
-    .json({ entry: result.entry, payload: result.payload });
-});
+chartsRouter.get(
+  '/charts/:id',
+  asyncRoute(async (req: Request, res: Response) => {
+    const result = await getChart(req.params.id);
+    if (!result) {
+      res.status(404).json({ error: 'Chart not found' });
+      return;
+    }
+    res
+      .set('ETag', result.entry.etag)
+      .json({ entry: result.entry, payload: result.payload });
+  }),
+);
 
 /* --------- Replace payload (PUT, optimistic locking) ----------------- */
-chartsRouter.put('/charts/:id', async (req: Request, res: Response) => {
-  const ifMatch = req.header('If-Match');
-  if (!ifMatch) {
-    res.status(428).json({ error: 'If-Match header is required' });
-    return;
-  }
-  const body = req.body ?? {};
-  const payload: ChartPayload = {
-    nodes: Array.isArray(body.nodes) ? body.nodes : [],
-    departments:
-      body.departments && typeof body.departments === 'object'
-        ? body.departments
-        : {},
-    customFields: Array.isArray(body.customFields) ? body.customFields : [],
-  };
+chartsRouter.put(
+  '/charts/:id',
+  asyncRoute(async (req: Request, res: Response) => {
+    const ifMatch = req.header('If-Match');
+    if (!ifMatch) {
+      res.status(428).json({ error: 'If-Match header is required' });
+      return;
+    }
+    const body = req.body ?? {};
+    const payload: ChartPayload = {
+      nodes: Array.isArray(body.nodes) ? body.nodes : [],
+      departments:
+        body.departments && typeof body.departments === 'object'
+          ? body.departments
+          : {},
+      customFields: Array.isArray(body.customFields) ? body.customFields : [],
+    };
 
-  const result = await putChart(req.params.id, ifMatch, payload);
-  if (result === null) {
-    res.status(404).json({ error: 'Chart not found' });
-    return;
-  }
-  if ('conflict' in result) {
-    res
-      .status(412)
-      .set('ETag', result.current.etag)
-      .json({ error: 'ETag mismatch', current: result.current });
-    return;
-  }
-  res.set('ETag', result.etag).json(result);
-});
+    const result = await putChart(req.params.id, ifMatch, payload);
+    if (result === null) {
+      res.status(404).json({ error: 'Chart not found' });
+      return;
+    }
+    if ('conflict' in result) {
+      res
+        .status(412)
+        .set('ETag', result.current.etag)
+        .json({ error: 'ETag mismatch', current: result.current });
+      return;
+    }
+    res.set('ETag', result.etag).json(result);
+  }),
+);
 
 /* --------- Patch metadata -------------------------------------------- */
-chartsRouter.patch('/charts/:id', async (req: Request, res: Response) => {
-  const body = req.body ?? {};
-  const patch: { name?: string; tags?: string[]; default?: boolean } = {};
-  if (typeof body.name === 'string') patch.name = body.name;
-  if (Array.isArray(body.tags)) patch.tags = body.tags;
-  if (typeof body.default === 'boolean') patch.default = body.default;
+chartsRouter.patch(
+  '/charts/:id',
+  asyncRoute(async (req: Request, res: Response) => {
+    const body = req.body ?? {};
+    const patch: { name?: string; tags?: string[]; default?: boolean } = {};
+    if (typeof body.name === 'string') patch.name = body.name;
+    if (Array.isArray(body.tags)) patch.tags = body.tags;
+    if (typeof body.default === 'boolean') patch.default = body.default;
 
-  if (Object.keys(patch).length === 0) {
-    res.status(400).json({ error: 'No metadata fields to update' });
-    return;
-  }
-  const entry = await patchMetadata(req.params.id, patch);
-  if (!entry) {
-    res.status(404).json({ error: 'Chart not found' });
-    return;
-  }
-  res.set('ETag', entry.etag).json(entry);
-});
+    if (Object.keys(patch).length === 0) {
+      res.status(400).json({ error: 'No metadata fields to update' });
+      return;
+    }
+    const entry = await patchMetadata(req.params.id, patch);
+    if (!entry) {
+      res.status(404).json({ error: 'Chart not found' });
+      return;
+    }
+    res.set('ETag', entry.etag).json(entry);
+  }),
+);
 
 /* --------- Delete ----------------------------------------------------- */
-chartsRouter.delete('/charts/:id', async (req: Request, res: Response) => {
-  const result = await deleteChart(req.params.id);
-  if (!result) {
-    res.status(404).json({ error: 'Chart not found' });
-    return;
-  }
-  if (result.newDefault) res.set('X-New-Default', result.newDefault.id);
-  res.status(204).end();
-});
+chartsRouter.delete(
+  '/charts/:id',
+  asyncRoute(async (req: Request, res: Response) => {
+    const result = await deleteChart(req.params.id);
+    if (!result) {
+      res.status(404).json({ error: 'Chart not found' });
+      return;
+    }
+    if (result.newDefault) res.set('X-New-Default', result.newDefault.id);
+    res.status(204).end();
+  }),
+);
