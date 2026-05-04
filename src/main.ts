@@ -149,6 +149,10 @@ function setupToolbarMenus(): void {
       const wasOpen = menu.getAttribute('data-open') === 'true';
       closeAllMenus();
       if (!wasOpen) {
+        // Refresh dynamic disabled-states right before showing the menu so
+        // the user always sees up-to-date affordances even if a selection
+        // was changed via keyboard or programmatically.
+        syncSelectionMenuItems(selection?.size?.() ?? 0);
         menu.setAttribute('data-open', 'true');
         trigger.setAttribute('aria-expanded', 'true');
         if (popup) popup.hidden = false;
@@ -763,6 +767,8 @@ function refreshBulkDropdowns() {
 }
 
 function syncBulkBar({ size, ids }) {
+  syncSelectionMenuItems(size);
+
   const bar = document.getElementById('bulk-bar');
   const count = document.getElementById('bulk-count');
   if (size === 0) {
@@ -775,6 +781,29 @@ function syncBulkBar({ size, ids }) {
   // Reset the dropdowns to the placeholder each time selection changes
   (document.getElementById('bulk-department') as HTMLSelectElement).value = '';
   (document.getElementById('bulk-country') as HTMLSelectElement).value = '';
+}
+
+/**
+ * Grey out the "Markierte Knoten" submenu items in the Aktionen ▾ dropdown
+ * when there's nothing to act on. The handleMenuAction() guard already
+ * skips `aria-disabled="true"` items, so this purely controls the visual
+ * affordance — users can't trigger the action by clicking a dimmed entry.
+ */
+function syncSelectionMenuItems(selectionSize: number): void {
+  const items = document.querySelectorAll<HTMLElement>(
+    '.menu-item[data-menu-action="copy-selected-text"], ' +
+      '.menu-item[data-menu-action="copy-selected-vcard"]',
+  );
+  const disabled = selectionSize === 0;
+  items.forEach((item) => {
+    if (disabled) {
+      item.setAttribute('aria-disabled', 'true');
+      item.title = 'Bitte zuerst Knoten markieren (Strg+Klick)';
+    } else {
+      item.removeAttribute('aria-disabled');
+      item.removeAttribute('title');
+    }
+  });
 }
 
 function bindBulkBar() {
@@ -1001,6 +1030,8 @@ async function bootstrap() {
     chartHost: document.getElementById('chart'),
     onChange: syncBulkBar,
   });
+  // Initial paint of the "Markierte Knoten" menu items — selection starts empty.
+  syncSelectionMenuItems(0);
 
   bindToolbar();
   setupToolbarMenus();
