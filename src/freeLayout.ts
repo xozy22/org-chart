@@ -221,6 +221,8 @@ export function bindNodeDrag(chart: any, store: any, onPersist?: () => void): vo
         if (!t) return false;
         if (t.closest?.('[data-action]')) return false;
         if (t.closest?.('.node-button-g')) return false;
+        // mailto:/tel: links must open the OS handler — not start a drag.
+        if (t.closest?.('a.node-card-link')) return false;
         return true;
       })
       .on('start', function () {

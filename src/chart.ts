@@ -169,7 +169,11 @@ function renderCustomFieldsOnCard(data) {
       display = `<a href="${safe}" target="_blank" rel="noopener noreferrer">${safe}</a>`;
     } else if (f.type === 'email') {
       const safe = escapeHtml(raw);
-      display = `<a href="mailto:${safe}">${safe}</a>`;
+      display =
+        `<a class="node-card-link" href="mailto:${safe}">${safe}</a>` +
+        `<button type="button" class="node-field-copy" data-action="copy-field"` +
+        ` data-value="${safe}" data-label="${escapeHtml(f.label)}"` +
+        ` title="${escapeHtml(f.label)} kopieren" aria-label="${escapeHtml(f.label)} kopieren">📋</button>`;
     } else {
       display = escapeHtml(raw);
     }
@@ -249,12 +253,33 @@ function renderNodeCard(d) {
         </div>
       </div>
       ${department ? renderDeptBadge(data.department) : ''}
-      ${email ? `<div class="node-card-email" title="${email}">✉ ${email}</div>` : ''}
-      ${phone ? `<div class="node-card-phone" title="${phone}">☎ ${phone}</div>` : ''}
+      ${email
+        ? `<div class="node-card-email" title="${email}">` +
+          `<a class="node-card-link" href="mailto:${email}" data-noselect>` +
+          `<span class="node-card-link-icon" aria-hidden="true">✉</span>` +
+          `<span class="node-card-link-text">${email}</span>` +
+          `</a>` +
+          `<button type="button" class="node-field-copy" data-action="copy-field"` +
+          ` data-value="${email}" data-label="E-Mail"` +
+          ` title="E-Mail kopieren" aria-label="E-Mail kopieren">📋</button>` +
+          `</div>`
+        : ''}
+      ${phone
+        ? `<div class="node-card-phone" title="${phone}">` +
+          `<a class="node-card-link" href="tel:${phone}" data-noselect>` +
+          `<span class="node-card-link-icon" aria-hidden="true">☎</span>` +
+          `<span class="node-card-link-text">${phone}</span>` +
+          `</a>` +
+          `<button type="button" class="node-field-copy" data-action="copy-field"` +
+          ` data-value="${phone}" data-label="Telefon"` +
+          ` title="Telefon kopieren" aria-label="Telefon kopieren">📋</button>` +
+          `</div>`
+        : ''}
       ${renderCustomFieldsOnCard(data)}
       <div class="node-card-actions">
         <button type="button" class="node-action node-action--add" data-action="add" data-id="${escapeHtml(data.id)}" title="Untergeordneten Knoten hinzufügen">+</button>
         <button type="button" class="node-action node-action--edit" data-action="edit" data-id="${escapeHtml(data.id)}" title="Bearbeiten">✎</button>
+        <button type="button" class="node-action node-action--copy" data-action="copy-node" data-id="${escapeHtml(data.id)}" title="Knoten-Daten kopieren">📋</button>
         <button type="button" class="node-action node-action--delete" data-action="delete" data-id="${escapeHtml(data.id)}" title="Löschen">🗑</button>
       </div>
     </div>

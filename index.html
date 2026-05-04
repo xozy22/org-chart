@@ -8,33 +8,112 @@
   </head>
   <body>
     <header class="toolbar">
+      <!-- Group 1: Workspace switcher (chart navigation) -->
       <div class="toolbar-group">
-        <button id="btn-add-root" class="btn btn-primary" title="Neuen Wurzelknoten hinzufügen">+ Wurzelknoten</button>
-        <button id="btn-undo" class="btn btn-icon" title="Rückgängig (Strg+Z)" aria-label="Rückgängig" disabled>↶</button>
-        <button id="btn-redo" class="btn btn-icon" title="Wiederholen (Strg+Y / Strg+Shift+Z)" aria-label="Wiederholen" disabled>↷</button>
-        <button id="btn-expand-all" class="btn" title="Alle ausklappen">Alle aufklappen</button>
-        <button id="btn-collapse-all" class="btn" title="Alle einklappen">Alle einklappen</button>
-        <button id="btn-layout-mode" class="btn" title="Layout-Modus umschalten">🔀 Auto</button>
-        <button id="btn-workspaces" class="btn" title="Charts verwalten" aria-label="Charts verwalten" hidden>🗂 Charts</button>
-        <button id="btn-settings" class="btn btn-icon" title="Eigene Felder verwalten" aria-label="Eigene Felder verwalten">⚙</button>
-        <button id="btn-stats" class="btn btn-icon" title="Statistiken anzeigen" aria-label="Statistiken anzeigen">📊</button>
+        <button id="btn-workspaces" class="btn btn-chart-name" title="Charts verwalten" aria-label="Charts verwalten" hidden>🗂 Charts</button>
       </div>
 
+      <!-- Group 2: Undo / redo (always-visible primary editing controls) -->
+      <div class="toolbar-group">
+        <button id="btn-undo" class="btn btn-icon" title="Rückgängig (Strg+Z)" aria-label="Rückgängig" disabled>↶</button>
+        <button id="btn-redo" class="btn btn-icon" title="Wiederholen (Strg+Y / Strg+Shift+Z)" aria-label="Wiederholen" disabled>↷</button>
+      </div>
+
+      <!-- Group 3: Search (centre, flex) -->
       <div class="toolbar-group toolbar-search">
         <input id="search-input" type="search" placeholder="🔍 Suche nach Name, Titel, Abteilung…" />
       </div>
 
+      <!-- Group 4: Actions menu (everything else) -->
       <div class="toolbar-group">
-        <button id="btn-import-json" class="btn" title="Org-Chart aus JSON-Datei laden">JSON ⬆</button>
-        <button id="btn-export-json" class="btn" title="Org-Chart als JSON-Datei speichern">JSON ⬇</button>
-        <button id="btn-import-csv" class="btn" title="Mitarbeiter aus CSV importieren">CSV ⬆</button>
-        <button id="btn-export-png" class="btn" title="Als PNG exportieren">PNG</button>
-        <button id="btn-export-svg" class="btn" title="Als SVG exportieren">SVG</button>
-        <button id="btn-export-pdf" class="btn" title="Als PDF exportieren">PDF</button>
+        <div class="menu" data-menu="actions">
+          <button id="btn-actions" class="btn menu-trigger" aria-haspopup="true" aria-expanded="false" type="button">
+            Aktionen <span class="menu-caret">▾</span>
+          </button>
+          <div class="menu-popup" role="menu" hidden>
+            <button class="menu-item menu-item-primary" data-menu-action="add-root" role="menuitem">
+              <span class="menu-icon">+</span><span class="menu-label">Neuer Wurzelknoten</span>
+            </button>
+            <hr class="menu-sep">
+            <button class="menu-item" data-menu-action="layout-mode" role="menuitem">
+              <span class="menu-icon">🔀</span><span class="menu-label">Layout: <span id="menu-layout-label">Auto</span></span>
+            </button>
+            <button class="menu-item" data-menu-action="expand-all" role="menuitem">
+              <span class="menu-icon">⊞</span><span class="menu-label">Alle aufklappen</span>
+            </button>
+            <button class="menu-item" data-menu-action="collapse-all" role="menuitem">
+              <span class="menu-icon">⊟</span><span class="menu-label">Alle einklappen</span>
+            </button>
+            <hr class="menu-sep">
+            <button class="menu-item" data-menu-action="settings" role="menuitem">
+              <span class="menu-icon">⚙</span><span class="menu-label">Eigene Felder…</span>
+            </button>
+            <button class="menu-item" data-menu-action="stats" role="menuitem">
+              <span class="menu-icon">📊</span><span class="menu-label">Statistiken</span>
+            </button>
+            <hr class="menu-sep">
+            <span class="menu-section-label">Auswahl kopieren</span>
+            <button class="menu-item" data-menu-action="copy-selected-text" role="menuitem">
+              <span class="menu-icon">📋</span><span class="menu-label">Markierten Knoten als Text</span>
+            </button>
+            <button class="menu-item" data-menu-action="copy-selected-vcard" role="menuitem">
+              <span class="menu-icon">📇</span><span class="menu-label">Markierten Knoten als vCard</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Group 5: File menu (import/export) -->
+        <div class="menu" data-menu="file">
+          <button id="btn-file" class="btn menu-trigger" aria-haspopup="true" aria-expanded="false" type="button">
+            Datei <span class="menu-caret">▾</span>
+          </button>
+          <div class="menu-popup" role="menu" hidden>
+            <span class="menu-section-label">Import</span>
+            <button class="menu-item" data-menu-action="import-json" role="menuitem">
+              <span class="menu-icon">⬆</span><span class="menu-label">JSON-Datei…</span>
+            </button>
+            <button class="menu-item" data-menu-action="import-csv" role="menuitem">
+              <span class="menu-icon">⬆</span><span class="menu-label">CSV-Datei…</span>
+            </button>
+            <hr class="menu-sep">
+            <span class="menu-section-label">Export</span>
+            <button class="menu-item" data-menu-action="export-json" role="menuitem">
+              <span class="menu-icon">⬇</span><span class="menu-label">JSON-Datei</span>
+            </button>
+            <button class="menu-item" data-menu-action="export-png" role="menuitem">
+              <span class="menu-icon">🖼</span><span class="menu-label">PNG (Bild)</span>
+            </button>
+            <button class="menu-item" data-menu-action="export-svg" role="menuitem">
+              <span class="menu-icon">🖼</span><span class="menu-label">SVG (Vektor)</span>
+            </button>
+            <button class="menu-item" data-menu-action="export-pdf" role="menuitem">
+              <span class="menu-icon">📄</span><span class="menu-label">PDF</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <input id="file-input-json" type="file" accept="application/json,.json" hidden />
       <input id="file-input-csv" type="file" accept="text/csv,.csv" hidden />
+
+      <!-- Hidden legacy buttons — preserved as event-target stubs so the
+           existing bindToolbar() listeners keep working. The dropdown
+           menu items dispatch click() to these. `btn-fit` already exists
+           in the floating zoom-fab so it isn't duplicated here. -->
+      <div hidden>
+        <button id="btn-add-root" type="button"></button>
+        <button id="btn-expand-all" type="button"></button>
+        <button id="btn-collapse-all" type="button"></button>
+        <button id="btn-layout-mode" type="button"></button>
+        <button id="btn-settings" type="button"></button>
+        <button id="btn-stats" type="button"></button>
+        <button id="btn-import-json" type="button"></button>
+        <button id="btn-export-json" type="button"></button>
+        <button id="btn-import-csv" type="button"></button>
+        <button id="btn-export-png" type="button"></button>
+        <button id="btn-export-svg" type="button"></button>
+        <button id="btn-export-pdf" type="button"></button>
+      </div>
     </header>
 
     <!-- Sub-toolbar: filter dropdowns -->
@@ -288,6 +367,17 @@
     </div>
 
     <div id="toast" class="toast" hidden></div>
+
+    <!-- Floating popover for the per-card "copy data" action. Positioned
+         dynamically next to the clicked button. Esc + outside-click close it. -->
+    <div id="card-copy-popover" class="card-copy-popover" role="menu" hidden>
+      <button type="button" class="menu-item" data-action="copy-as-text" role="menuitem">
+        <span class="menu-icon">📋</span><span class="menu-label">Als Text</span>
+      </button>
+      <button type="button" class="menu-item" data-action="copy-as-vcard" role="menuitem">
+        <span class="menu-icon">📇</span><span class="menu-label">Als vCard</span>
+      </button>
+    </div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

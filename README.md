@@ -116,6 +116,113 @@ docker compose up -d
 
 The bundled `docker-compose.yml` boots both services and bind-mounts `./data` for chart persistence. Charts created in the workspace UI are written to `./data/charts/<id>.json`; the index lives in `./data/charts.index.json`.
 
+### Pointing the backend at your own shared folder
+
+The backend stores every chart as a plain JSON file inside one directory.
+The container expects that directory to be mounted at **`/app/data`**; the
+host path is up to you. Pick whichever pattern fits your environment:
+
+#### A) Bind-mount a path on the host (most common)
+
+Edit the `volumes:` line of the `org-chart-backend` service:
+
+```yaml
+services:
+  org-chart-backend:
+    volumes:
+      - /srv/org-chart/data:/app/data         # absolute path
+      # - ./data:/app/data                    # default — relative to compose file
+      # - ${ORG_CHART_DATA:-./data}:/app/data # via env var with fallback
+```
+
+Or override per-shell without editing the file:
+
+```bash
+ORG_CHART_DATA=/srv/org-chart/data docker compose up -d
+```
+
+The directory is created on first start; charts then land as
+`/srv/org-chart/data/charts/<id>.json`. Move that folder anywhere
+(NAS, mounted SMB share, encrypted volume) — the backend doesn't care
+as long as it has read/write access.
+
+#### B) Named Docker volume (recommended for production)
+
+```yaml
+services:
+  org-chart-backend:
+    volumes:
+      - org_chart_data:/app/data
+
+volumes:
+  org_chart_data:
+```
+
+Inspect with `docker volume inspect org_chart_data` to see where Docker
+stores it on disk. Survives `docker compose down` (only `down -v` deletes
+it).
+
+#### C) Standalone `docker run` (no compose)
+
+```bash
+docker run -d --name org-chart-backend \
+  -v /srv/org-chart/data:/app/data \
+  -p 3000:3000 \
+  ghcr.io/xozy22/org-chart-backend:latest
+```
+
+Then point the frontend container at it via the same nginx proxy or run
+the frontend separately and set `VITE_API_BASE` at build time.
+
+#### Customising the in-container path
+
+If `/app/data` doesn't fit your workflow, override `DATA_DIR`:
+
+```yaml
+services:
+  org-chart-backend:
+    environment:
+      - DATA_DIR=/var/lib/orgchart
+    volumes:
+      - /srv/org-chart/data:/var/lib/orgchart
+```
+
+#### Seeding the folder & manual edits
+
+The folder is just JSON files — you can:
+
+- **Seed it from an existing chart**: drop the JSON into
+  `data/charts/<some-uuid>.json` and add a matching entry to
+  `data/charts.index.json` *before* the backend starts. (Or simply use
+  the workspace UI's *Duplicate* / *Import* — easier and computes the
+  ETag for you.)
+- **Back it up**: a plain `tar -czf charts-backup.tgz data/` is enough.
+- **Edit by hand**: stop the backend, edit, restart. Avoid editing live
+  — the backend caches ETags and a manual write would race the optimistic
+  lock.
+
+#### File ownership
+
+The backend runs as the non-root `app` user inside the container. If
+your host directory is owned by a different UID you'll see `EACCES`
+errors on write. Two fixes:
+
+```bash
+# 1) Make the directory world-writable for the container's user:
+sudo chmod -R a+rwX /srv/org-chart/data
+```
+
+…or override the container UID/GID to match your host user:
+
+```yaml
+services:
+  org-chart-backend:
+    user: "${UID:-1000}:${GID:-1000}"
+```
+
+Then `chown -R 1000:1000 /srv/org-chart/data` (or whatever IDs you
+chose) and the writes succeed.
+
 ### Build images yourself
 
 ```bash
@@ -135,10 +242,12 @@ The CI publishes both `linux/amd64` and `linux/arm64` for both images, so they r
 
 ### With the backend container running
 
+See [Pointing the backend at your own shared folder](#pointing-the-backend-at-your-own-shared-folder) for how to choose / override the host directory.
+
 | What | Where | Notes |
 |---|---|---|
-| Chart payloads (nodes, departments, custom-fields schema) | `./data/charts/<id>.json` (host volume mounted into the backend) | Shared across all users hitting the same backend |
-| Index & metadata (name, tags, default flag, ETag) | `./data/charts.index.json` | Single file, atomic writes |
+| Chart payloads (nodes, departments, custom-fields schema) | `<your-volume>/charts/<id>.json` (host volume mounted at `/app/data` in the backend) | Shared across all users hitting the same backend |
+| Index & metadata (name, tags, default flag, ETag) | `<your-volume>/charts.index.json` | Single file, atomic writes |
 | Free-layout positions | Browser `localStorage` (`orgchart.positions.v1.<chart-id>`) | Per-user; everyone sees the same chart but their own placement |
 | `auto` / `free` mode | Browser `localStorage` (`orgchart.layoutmode.v1.<chart-id>`) | Per-user |
 | Active chart | Browser `localStorage` (`orgchart.currentChartId`) | So a reload returns to the same chart |

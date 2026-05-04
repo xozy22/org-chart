@@ -15,7 +15,8 @@ import { COUNTRIES, countryName } from './countries.js';
 import * as api from './api.js';
 import { setupWorkspaces, type WorkspacesController } from './workspaces.js';
 import { showConflict } from './conflict.js';
-import type { LayoutMode, ChartPayload } from './types.js';
+import { copyText, formatNodeAsText, formatNodeAsVCard } from './clipboard.js';
+import type { LayoutMode, ChartPayload, OrgNode } from './types.js';
 
 let chart = null;
 let modal = null;
@@ -65,6 +66,8 @@ function rerender() {
 }
 
 function syncLayoutToggleUI() {
+  // Hidden legacy toolbar button — still used by other code paths so we keep
+  // its label in sync, but it isn't rendered in the new menu-driven toolbar.
   const btn = document.getElementById('btn-layout-mode') as HTMLButtonElement | null;
   if (btn) {
     btn.textContent = store.layoutMode === 'free' ? '🔀 Frei' : '🔀 Auto';
@@ -74,6 +77,12 @@ function syncLayoutToggleUI() {
         : 'Auf manuelle Anordnung wechseln';
     btn.classList.toggle('btn-primary', store.layoutMode === 'free');
   }
+
+  // Reflect the mode in the new actions menu so the user knows which
+  // mode is active without opening the menu twice.
+  const menuLabel = document.getElementById('menu-layout-label');
+  if (menuLabel) menuLabel.textContent = store.layoutMode === 'free' ? 'Frei' : 'Auto';
+
   const chartHost = document.getElementById('chart');
   if (chartHost) chartHost.classList.toggle('is-free', store.layoutMode === 'free');
 
@@ -86,6 +95,130 @@ function syncLayoutToggleUI() {
     const el = document.getElementById(id) as HTMLButtonElement | null;
     if (el) el.disabled = isFree;
   });
+  // Mirror the disabled state onto the matching menu items.
+  document
+    .querySelectorAll('.menu-item[data-menu-action="expand-all"], .menu-item[data-menu-action="collapse-all"]')
+    .forEach((el) => {
+      if (isFree) el.setAttribute('aria-disabled', 'true');
+      else el.removeAttribute('aria-disabled');
+    });
+}
+
+/* -------------------------------------------------------------------- */
+/*  Toolbar dropdown menus (Aktionen / Datei)                           */
+/* -------------------------------------------------------------------- */
+
+const MENU_ACTION_TO_BTN_ID: Record<string, string> = {
+  'add-root':    'btn-add-root',
+  'layout-mode': 'btn-layout-mode',
+  'expand-all':  'btn-expand-all',
+  'collapse-all': 'btn-collapse-all',
+  'settings':    'btn-settings',
+  'stats':       'btn-stats',
+  'import-json': 'btn-import-json',
+  'export-json': 'btn-export-json',
+  'import-csv':  'btn-import-csv',
+  'export-png':  'btn-export-png',
+  'export-svg':  'btn-export-svg',
+  'export-pdf':  'btn-export-pdf',
+};
+
+function closeAllMenus(): void {
+  document.querySelectorAll<HTMLElement>('.menu[data-open="true"]').forEach((m) => {
+    m.removeAttribute('data-open');
+    const trigger = m.querySelector<HTMLElement>('.menu-trigger');
+    trigger?.setAttribute('aria-expanded', 'false');
+    const popup = m.querySelector<HTMLElement>('.menu-popup');
+    if (popup) popup.hidden = true;
+  });
+}
+
+function setupToolbarMenus(): void {
+  const menus = document.querySelectorAll<HTMLElement>('.menu[data-menu]');
+  menus.forEach((menu) => {
+    const trigger = menu.querySelector<HTMLElement>('.menu-trigger');
+    const popup = menu.querySelector<HTMLElement>('.menu-popup');
+
+    trigger?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const wasOpen = menu.getAttribute('data-open') === 'true';
+      closeAllMenus();
+      if (!wasOpen) {
+        menu.setAttribute('data-open', 'true');
+        trigger.setAttribute('aria-expanded', 'true');
+        if (popup) popup.hidden = false;
+      }
+    });
+
+    popup?.addEventListener('click', (ev) => {
+      const item = (ev.target as Element | null)?.closest('[data-menu-action]') as HTMLElement | null;
+      if (!item) return;
+      if (item.getAttribute('aria-disabled') === 'true') return;
+      const action = item.getAttribute('data-menu-action');
+      closeAllMenus();
+      if (action) handleMenuAction(action);
+    });
+  });
+
+  // Close on outside click + Esc.
+  document.addEventListener('click', (ev) => {
+    const t = ev.target as Element | null;
+    if (t && t.closest('.menu')) return;
+    closeAllMenus();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') closeAllMenus();
+  });
+}
+
+function handleMenuAction(action: string): void {
+  // Special-cased actions that don't map to a hidden legacy button.
+  if (action === 'copy-selected-text' || action === 'copy-selected-vcard') {
+    copySelectedNode(action === 'copy-selected-vcard' ? 'vcard' : 'text');
+    return;
+  }
+  const btnId = MENU_ACTION_TO_BTN_ID[action];
+  if (!btnId) return;
+  const btn = document.getElementById(btnId) as HTMLButtonElement | null;
+  if (!btn) return;
+  // Bypass `disabled` checks on the hidden legacy button: the menu has its
+  // own aria-disabled gate we already enforced above.
+  const wasDisabled = btn.disabled;
+  if (wasDisabled) btn.disabled = false;
+  btn.click();
+  if (wasDisabled) btn.disabled = true;
+}
+
+/**
+ * Copy the currently selected node (or the only node, if there's just one)
+ * as text or vCard. Falls back with a toast hint when nothing is selected.
+ */
+async function copySelectedNode(format: 'text' | 'vcard'): Promise<void> {
+  const ids = selection?.getAll?.() ?? [];
+  let id: string | null = ids[0] ?? null;
+  if (!id) {
+    // No selection — try the only node, otherwise nudge the user.
+    const all = store.get();
+    if (all.length === 1) id = String(all[0].id);
+    else {
+      toast('Bitte zuerst einen Knoten markieren (Strg+Klick)', 'info', 2400);
+      return;
+    }
+  }
+  const node = store.byId(id) as OrgNode | undefined;
+  if (!node) return;
+  await copyNodeToClipboard(node, format);
+}
+
+/** Shared core: format + write + toast. Used by card-button and toolbar-menu. */
+async function copyNodeToClipboard(node: OrgNode, format: 'text' | 'vcard'): Promise<void> {
+  const payload = format === 'vcard' ? formatNodeAsVCard(node) : formatNodeAsText(node);
+  const ok = await copyText(payload);
+  if (ok) {
+    toast(format === 'vcard' ? 'Als vCard kopiert' : 'Als Text kopiert', 'info', 1800);
+  } else {
+    toast('Kopieren fehlgeschlagen', 'error', 2400);
+  }
 }
 
 function setLayoutMode(mode: LayoutMode) {
@@ -398,13 +531,45 @@ function bindNodeActionDelegation() {
   });
 
   container.addEventListener('click', (ev) => {
-    const target = ev.target instanceof Element ? ev.target.closest('[data-action]') : null;
+    if (!(ev.target instanceof Element)) return;
+
+    // mailto:/tel: anchor — let the browser handle navigation, but stop the
+    // event from bubbling up into the card-select handler above.
+    const link = ev.target.closest('a.node-card-link') as HTMLAnchorElement | null;
+    if (link) {
+      ev.stopPropagation();
+      return; // do NOT preventDefault — we want the OS handler to fire.
+    }
+
+    const target = ev.target.closest('[data-action]');
     if (!target) return;
     ev.stopPropagation();
     const action = target.getAttribute('data-action');
+
+    // Per-field copy (email / phone / custom-email): copy the value, toast.
+    if (action === 'copy-field') {
+      ev.preventDefault();
+      const value = target.getAttribute('data-value') || '';
+      const label = target.getAttribute('data-label') || 'Wert';
+      if (!value) return;
+      copyText(value).then((ok) => {
+        if (ok) toast(`${label} kopiert`, 'info', 1500);
+        else toast('Kopieren fehlgeschlagen', 'error', 2400);
+      });
+      return;
+    }
+
+    // Per-card "copy node data" → opens the format-picker popover.
+    if (action === 'copy-node') {
+      ev.preventDefault();
+      const id = target.getAttribute('data-id');
+      if (!id) return;
+      openCardCopyPopover(target as HTMLElement, id);
+      return;
+    }
+
     const id = target.getAttribute('data-id');
     if (!id) return;
-
     if (action === 'add') {
       modal.openForCreate({ parentId: id });
     } else if (action === 'edit') {
@@ -420,6 +585,82 @@ function bindNodeActionDelegation() {
       rerender();
     }
   });
+}
+
+/* -------------------------------------------------------------------- */
+/*  Card-copy popover (Als Text / Als vCard)                            */
+/* -------------------------------------------------------------------- */
+
+let cardCopyTargetId: string | null = null;
+
+function openCardCopyPopover(anchor: HTMLElement, nodeId: string): void {
+  const popover = document.getElementById('card-copy-popover') as HTMLElement | null;
+  if (!popover) return;
+  cardCopyTargetId = nodeId;
+  popover.hidden = false;
+
+  // Position the popover just below-and-to-the-right of the trigger button,
+  // clamped to the viewport so it never falls off the edge.
+  const rect = anchor.getBoundingClientRect();
+  const margin = 6;
+  popover.style.visibility = 'hidden';
+  popover.style.left = '0px';
+  popover.style.top = '0px';
+  // Force layout to read dimensions
+  const pw = popover.offsetWidth || 160;
+  const ph = popover.offsetHeight || 80;
+  let left = rect.right - pw;
+  let top = rect.bottom + margin;
+  // Clamp horizontally
+  if (left < 8) left = 8;
+  if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+  // Flip above the anchor if it would overflow the viewport bottom.
+  if (top + ph > window.innerHeight - 8) {
+    top = rect.top - ph - margin;
+  }
+  popover.style.left = `${Math.round(left)}px`;
+  popover.style.top = `${Math.round(top)}px`;
+  popover.style.visibility = '';
+}
+
+function closeCardCopyPopover(): void {
+  const popover = document.getElementById('card-copy-popover') as HTMLElement | null;
+  if (!popover) return;
+  popover.hidden = true;
+  cardCopyTargetId = null;
+}
+
+function setupCardCopyPopover(): void {
+  const popover = document.getElementById('card-copy-popover') as HTMLElement | null;
+  if (!popover) return;
+
+  popover.addEventListener('click', async (ev) => {
+    const item = (ev.target as Element | null)?.closest('[data-action]') as HTMLElement | null;
+    if (!item) return;
+    ev.stopPropagation();
+    const action = item.getAttribute('data-action');
+    const id = cardCopyTargetId;
+    closeCardCopyPopover();
+    if (!id) return;
+    const node = store.byId(id) as OrgNode | undefined;
+    if (!node) return;
+    if (action === 'copy-as-text') await copyNodeToClipboard(node, 'text');
+    else if (action === 'copy-as-vcard') await copyNodeToClipboard(node, 'vcard');
+  });
+
+  // Close on outside-click and Esc — same pattern as the toolbar menus.
+  document.addEventListener('click', (ev) => {
+    if (popover.hidden) return;
+    const t = ev.target as Element | null;
+    if (t && (t.closest('#card-copy-popover') || t.closest('[data-action="copy-node"]'))) return;
+    closeCardCopyPopover();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') closeCardCopyPopover();
+  });
+  // Close when the chart re-renders or scrolls.
+  window.addEventListener('resize', closeCardCopyPopover);
+  window.addEventListener('scroll', closeCardCopyPopover, true);
 }
 
 function syncHistoryButtons(status: { canUndo: boolean; canRedo: boolean }) {
@@ -709,6 +950,8 @@ async function bootstrap() {
   });
 
   bindToolbar();
+  setupToolbarMenus();
+  setupCardCopyPopover();
   bindNodeActionDelegation();
   bindKeyboardShortcuts();
   bindBulkBar();
