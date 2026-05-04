@@ -26,7 +26,7 @@ A browser-based organisational chart builder. TypeScript + [d3-org-chart](https:
 | Area | What it does |
 |---|---|
 | **Card content** | Avatar (image or auto-initials), name, title, department badge, email, phone, country flag |
-| **Clickable contacts** | Email = `mailto:` link, phone = `tel:` link. Per-field copy icon on hover; per-card copy menu produces formatted text or an RFC-6350 vCard ready to import into address books. |
+| **Clickable contacts** | Email = `mailto:` link, phone = `tel:` link. Per-field copy icon on hover; per-card menu and toolbar action either copy the node as plain text **or download an RFC-6350 vCard (`.vcf`)** ready to import into Apple Contacts / Outlook / Google. Multi-select (Ctrl+Click) bundles every selected node into a single `<chart>_vcards_<date>.zip`. |
 | **Custom fields** | User-defined extras (text / number / date / url / email) with toggleable card visibility |
 | **Multi-root** | Any number of `parentId: null` nodes; each subtree gets a stable colour container with a `ROOT` badge that descendants inherit |
 | **Departments** | Auto-suggest dropdown of every known department + 11-colour palette + custom colour picker, shared by every card in the same department |
@@ -45,7 +45,7 @@ A browser-based organisational chart builder. TypeScript + [d3-org-chart](https:
 |---|---|
 | **Search & filter** | Free-text search plus structured filter dropdowns (department, country, root). Non-matches dim while keeping the hierarchy intact. |
 | **URL state** | Active filters mirror to the location hash (`#dept=Technik&country=de`) — every view is shareable as a link |
-| **Multi-select & bulk** | Ctrl/Cmd-click to multi-select; floating bulk bar with delete, change-department and change-country |
+| **Multi-select & bulk** | Ctrl/Cmd-click to multi-select; floating bulk bar with delete, change-department, change-country; "Markierte Knoten" submenu in the **Aktionen ▾** dropdown copies the selection as text or downloads it as a vCard ZIP |
 | **Stats sidebar** | KPI tiles + bar charts: total / roots / departments / countries / avg & max depth, completeness ratios, top departments and countries |
 | **Minimap** | Bottom-right canvas overview, dims off-screen area, click-to-recentre |
 | **Zoom controls** | Bottom-left FAB cluster (Google-Maps style): `+`, `−`, `⊕` Fit. Wheel and pinch keep working. |
@@ -58,6 +58,7 @@ A browser-based organisational chart builder. TypeScript + [d3-org-chart](https:
 | **Country flags** | 59 countries via [`flag-icons`](https://github.com/lipis/flag-icons), datalist autocomplete by name or ISO-2 code |
 | **Image export** | High-quality PNG (2× pixel ratio), self-contained SVG, A4 PDF — every CSS rule and flag image is inlined so the export looks identical to the live view |
 | **JSON / CSV import & export** | v3 envelope with nodes, departments **and** custom-fields schema; legacy v2 + bare-array forms still accepted |
+| **Contact export (vCard)** | Single node → `.vcf` download; multi-select → ZIP bundle of one `.vcf` per node, ready to drag into Apple Contacts, Outlook or Google Contacts. UTF-8 BOM and `text/vcard` MIME type set so Windows mail clients detect the encoding. |
 
 ![Edit modal](docs/screenshot-edit-modal.png)
 
