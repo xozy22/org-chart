@@ -258,9 +258,17 @@
             <span>Telefon</span>
             <input name="phone" type="tel" placeholder="z. B. +49 89 1234567" autocomplete="off" />
           </label>
-          <label>
-            <span>Bild-URL</span>
-            <input name="imageUrl" type="url" placeholder="https://…" autocomplete="off" />
+          <label class="field-with-image">
+            <span>Bild</span>
+            <span class="image-field">
+              <span class="image-preview" id="image-preview" aria-hidden="true"></span>
+              <span class="image-controls">
+                <input name="imageUrl" type="url" placeholder="URL oder Datei hochladen…" autocomplete="off" />
+                <button type="button" id="image-upload-btn" class="btn btn-icon" title="Bild von Festplatte hochladen" aria-label="Bild hochladen">📁</button>
+                <button type="button" id="image-clear-btn" class="btn btn-icon" title="Bild entfernen" aria-label="Bild entfernen" hidden>✕</button>
+              </span>
+            </span>
+            <input id="image-upload-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml" hidden />
           </label>
           <label class="field-with-flag">
             <span>Land</span>

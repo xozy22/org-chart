@@ -1811,6 +1811,47 @@ svg path.link,
   box-shadow: 0 0 0 3px rgba(218, 41, 28, 0.18);
 }
 
+/* Image field with thumbnail preview + upload button */
+.field-with-image .image-field {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.image-preview {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong, #d4d7dd);
+  background-color: #f6f7f9;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #9ca3af;
+}
+.image-preview:not(.has-image)::before {
+  content: '🖼';
+}
+
+.image-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: 1;
+}
+.image-controls input[type="url"] { flex: 1; min-width: 0; }
+.image-controls .btn-icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  font-size: 14px;
+}
+
 /* Country field with flag preview */
 .field-with-flag .field-input-wrap {
   position: relative;

@@ -34,6 +34,7 @@ A browser-based organisational chart builder. TypeScript + [d3-org-chart](https:
 | Area | What it does |
 |---|---|
 | **Card content** | Avatar (image or auto-initials), name, title, department badge, email, phone, country flag |
+| **Avatar upload** | Drag a JPG / PNG / GIF / WebP / SVG onto the upload button in the edit modal — the file is stored on the server under `<data>/images/<uuid>.<ext>` and the node's `imageUrl` is set to `/api/images/<uuid>.<ext>`. Pasting an external URL still works. Max 5 MB per image (override via `IMAGE_MAX_BYTES` env var). |
 | **Clickable contacts** | Email = `mailto:` link, phone = `tel:` link. Per-field copy icon on hover; per-card menu and toolbar action either copy the node as plain text **or download an RFC-6350 vCard (`.vcf`)** ready to import into Apple Contacts / Outlook / Google. Multi-select (Ctrl+Click) bundles every selected node into a single `<chart>_vcards_<date>.zip`. |
 | **Custom fields** | User-defined extras (text / number / date / url / email) with toggleable card visibility |
 | **Multi-root** | Any number of `parentId: null` nodes; each subtree gets a stable colour container with a `ROOT` badge that descendants inherit |
@@ -132,9 +133,13 @@ the backend creates two things:
 ```
 /app/data/
 ├── charts.index.json          ← list of {id, name, tags, default, etag, …}
-└── charts/
-    ├── <uuid>.json            ← full chart payload
-    ├── <uuid>.json
+├── charts/
+│   ├── <uuid>.json            ← full chart payload
+│   ├── <uuid>.json
+│   └── …
+└── images/                    ← uploaded avatar images
+    ├── <uuid>.png
+    ├── <uuid>.jpg
     └── …
 ```
 
@@ -379,6 +384,7 @@ All knobs are environment variables. Defaults shown in brackets.
 | `DATA_DIR` *(`/app/data`)* | Absolute path to the chart-storage directory |
 | `STATIC_DIR` *(`/app/public`)* | Absolute path to the compiled SPA bundle. Set empty / unset to run API-only |
 | `CORS_ORIGIN` *(`*`)* | Comma-separated list of allowed origins, or `*` |
+| `IMAGE_MAX_BYTES` *(`5242880`)* | Max accepted size for avatar uploads (in bytes — default 5 MB) |
 | `NODE_ENV` *(`production`)* | Standard Node env flag |
 
 In dev only:
@@ -401,7 +407,9 @@ The server exposes a single resource. All bodies are JSON.
 | `PUT`    | `/api/charts/:id` | `If-Match: <etag>` required → 200 or 412 (conflict) |
 | `PATCH`  | `/api/charts/:id` | Body `{name?, tags?, default?}` |
 | `DELETE` | `/api/charts/:id` | Auto-promotes oldest as new default if needed; surfaces it via `X-New-Default` header |
-| `GET`    | `/api/healthz`    | Liveness probe |
+| `POST`   | `/api/images`             | Multipart form with field `image` → 201 + `{ url, bytes, type }`. Stores under `<data>/images/<uuid>.<ext>`. |
+| `GET`    | `/api/images/:filename`   | Serves the uploaded image with 30-day cache headers |
+| `GET`    | `/api/healthz`            | Liveness probe |
 
 ETags are 7-char SHA-1 prefixes over the canonical payload — clients
 hold the value from the last `GET`/`PUT` and round-trip it as `If-Match`

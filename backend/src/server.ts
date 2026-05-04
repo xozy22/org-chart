@@ -20,6 +20,7 @@ import express from 'express';
 import type { ErrorRequestHandler, Request, Response, NextFunction } from 'express';
 
 import { chartsRouter } from './routes/charts.js';
+import { imagesRouter } from './routes/images.js';
 import { reconcileFromDisk } from './storage.js';
 import { startAutoImportWatcher } from './autoImport.js';
 
@@ -53,6 +54,7 @@ app.get('/api/healthz', (_req, res) => {
   res.json({ ok: true, version: '0.2.0' });
 });
 app.use('/api', chartsRouter);
+app.use('/api', imagesRouter);
 
 // ── Static frontend + SPA fallback ──────────────────────────────────────
 if (STATIC_DIR_EXISTS) {

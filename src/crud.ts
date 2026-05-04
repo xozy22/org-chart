@@ -106,6 +106,74 @@ export function setupModal({ store, onChange }: { store: any; onChange?: () => v
     countryInput.focus();
   });
 
+  /* ---------------- Image upload + preview ---------------- */
+  const imageUrlInput = form.elements.namedItem('imageUrl') as HTMLInputElement | null;
+  const imagePreview = $<HTMLElement>('#image-preview');
+  const imageUploadBtn = $<HTMLButtonElement>('#image-upload-btn');
+  const imageUploadInput = $<HTMLInputElement>('#image-upload-input');
+  const imageClearBtn = $<HTMLButtonElement>('#image-clear-btn');
+
+  function syncImagePreview() {
+    if (!imagePreview || !imageUrlInput) return;
+    const url = imageUrlInput.value.trim();
+    if (url) {
+      imagePreview.style.backgroundImage = `url("${url.replace(/"/g, '%22')}")`;
+      imagePreview.classList.add('has-image');
+    } else {
+      imagePreview.style.backgroundImage = '';
+      imagePreview.classList.remove('has-image');
+    }
+    if (imageClearBtn) imageClearBtn.hidden = !url;
+  }
+  imageUrlInput?.addEventListener('input', syncImagePreview);
+  imageUrlInput?.addEventListener('change', syncImagePreview);
+
+  imageClearBtn?.addEventListener('click', () => {
+    if (!imageUrlInput) return;
+    imageUrlInput.value = '';
+    syncImagePreview();
+    imageUrlInput.focus();
+  });
+
+  imageUploadBtn?.addEventListener('click', () => imageUploadInput?.click());
+
+  imageUploadInput?.addEventListener('change', async () => {
+    const file = imageUploadInput.files?.[0];
+    if (!file) return;
+    if (!imageUrlInput || !imageUploadBtn) return;
+    const originalLabel = imageUploadBtn.textContent;
+    imageUploadBtn.disabled = true;
+    imageUploadBtn.textContent = '⏳';
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const res = await fetch('/api/images', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const body: any = await res.json().catch(() => ({}));
+        throw new Error(body?.error || `Upload fehlgeschlagen (${res.status})`);
+      }
+      const body = (await res.json()) as { url: string };
+      imageUrlInput.value = body.url;
+      syncImagePreview();
+    } catch (err) {
+      const msg = (err as Error)?.message || String(err);
+      // Use the global toast helper if present, else alert as a last resort.
+      const toastEl = document.getElementById('toast') as HTMLElement | null;
+      if (toastEl) {
+        toastEl.textContent = `Bild-Upload: ${msg}`;
+        toastEl.className = 'toast error';
+        toastEl.hidden = false;
+        setTimeout(() => (toastEl.hidden = true), 3500);
+      } else {
+        alert(`Bild-Upload: ${msg}`);
+      }
+    } finally {
+      imageUploadBtn.disabled = false;
+      imageUploadBtn.textContent = originalLabel ?? '📁';
+      imageUploadInput.value = '';
+    }
+  });
+
   const swatches = Array.from(form.querySelectorAll<HTMLButtonElement>('.color-swatch'));
 
   function markActiveSwatch(hex) {
@@ -186,6 +254,7 @@ export function setupModal({ store, onChange }: { store: any; onChange?: () => v
     }
     syncFlagPreview();
     syncDeptColor();
+    syncImagePreview();
   }
 
   function readForm(): Record<string, any> {
