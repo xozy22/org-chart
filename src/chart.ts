@@ -235,13 +235,10 @@ function renderNodeCard(d) {
         `background:linear-gradient(180deg, ${hexAlpha(rootColor, 0.07)} 0%, #fff 60%);`;
     }
   }
-  const rootBadge = isRoot
-    ? `<div class="node-card-rootbadge" style="background:${rootColor};">ROOT</div>`
-    : '';
-
+  // Root nodes are already visually distinct via the heavy coloured frame,
+  // soft tint and accent strip — no extra ROOT badge needed.
   return `
     <div class="node-card${isRoot ? ' is-root' : ''}" data-id="${escapeHtml(data.id)}" style="${cardStyle}">
-      ${rootBadge}
       <div class="node-card-top">
         ${avatar}
         <div class="node-card-meta">
@@ -295,7 +292,7 @@ export function createChart(
   const chart = new OrgChart()
     .container(container)
     .data(data)
-    .nodeWidth((d) => (d.data._virtual ? 1 : 240))
+    .nodeWidth((d) => (d.data._virtual ? 1 : 270))
     .nodeHeight((d) => {
       if (d.data._virtual) return 1;
       // Reserve ~16px of vertical space for each custom field rendered
@@ -306,7 +303,11 @@ export function createChart(
             (f) => f.showOnCard && d.data?.[f.key] != null && d.data?.[f.key] !== '',
           ).length
         : 0;
-      return 150 + visibleOnThisNode * 16;
+      // Long names wrap to 2 lines (line-clamp:2 in styles.css) and need
+      // a little extra vertical room. Header column is ~190 px wide.
+      const nameLen = String(d.data?.name || '').length;
+      const longName = nameLen > 22;
+      return 150 + (longName ? 18 : 0) + visibleOnThisNode * 16;
     })
     .childrenMargin((d) => (d.data?._virtual ? 0 : 60))
     .compactMarginBetween(() => 35)

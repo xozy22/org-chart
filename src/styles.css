@@ -718,9 +718,17 @@ svg path.link,
 }
 
 .node-card-name-text {
-  white-space: nowrap;
+  /* Long names (e.g. "Externe Beratung GmbH") wrap to a second line
+     instead of being ellipsis-clipped. Hard cap at 2 lines so cards
+     keep their predictable height — see nodeHeight() in chart.ts which
+     reserves a little extra room when the name is long. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.2;
   min-width: 0;
 }
 
@@ -1549,27 +1557,6 @@ svg path.link,
   /* Persistent (not hover-only) left rail in the root colour. */
   width: 4px;
   background: var(--root-color, var(--ft-red));
-}
-
-.node-card-rootbadge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 1.2px;
-  color: white;
-  text-transform: uppercase;
-  box-shadow: 0 1px 2px rgba(15, 17, 21, 0.18);
-  pointer-events: none;
-}
-
-/* Push the action buttons left so the ROOT badge stays clear. */
-.node-card.is-root .node-card-actions {
-  right: 64px;
 }
 
 /* =========================================================
