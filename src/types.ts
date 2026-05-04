@@ -71,6 +71,34 @@ export interface FilterValues {
   rootDescendants?: Set<string> | null;
 }
 
+/** Metadata of a chart in the backend index — never includes the heavy payload. */
+export interface ChartIndexEntry {
+  id: string;
+  name: string;
+  tags: string[];
+  default: boolean;
+  createdAt: string;
+  updatedAt: string;
+  etag: string;
+  nodeCount: number;
+  departmentCount: number;
+}
+
+/** Full chart payload as it travels over the wire / sits in the store. */
+export interface ChartPayload {
+  nodes: OrgNode[];
+  departments: Record<string, string>;
+  customFields: CustomField[];
+}
+
+/** Error returned by the API client when something goes wrong. */
+export interface ApiError {
+  status: number;
+  message: string;
+  /** When `status === 412`, contains the server-side current entry. */
+  conflict?: ChartIndexEntry;
+}
+
 /** Result of `computeStats` in stats.ts. */
 export interface ChartStats {
   total: number;

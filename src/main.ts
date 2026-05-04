@@ -12,13 +12,17 @@ import { setupCustomFieldsUI } from './customFields.js';
 import { computeStats } from './stats.js';
 import { bindNodeDrag, applyManualPositions } from './freeLayout.js';
 import { COUNTRIES, countryName } from './countries.js';
-import type { LayoutMode } from './types.js';
+import * as api from './api.js';
+import { setupWorkspaces, type WorkspacesController } from './workspaces.js';
+import { showConflict } from './conflict.js';
+import type { LayoutMode, ChartPayload } from './types.js';
 
 let chart = null;
 let modal = null;
 let filtersRef = null;
 let history = null;
 let selection = null;
+let workspaces: WorkspacesController | null = null;
 
 function toast(message: string, kind: 'info' | 'error' = 'info', ms = 2400) {
   const el = document.getElementById('toast') as HTMLElement;
@@ -113,6 +117,61 @@ function setLayoutMode(mode: LayoutMode) {
 }
 
 async function loadInitialData() {
+  // Step 1: detect backend
+  store.apiAvailable = await api.healthz();
+
+  if (store.apiAvailable) {
+    try {
+      // Step 2: list charts
+      let charts = await api.listCharts();
+
+      if (charts.length === 0) {
+        // Step 3a: empty backend → migrate localStorage to backend, or
+        // create the demo chart from sample-data.json.
+        const local = store.load();
+        let payload: ChartPayload;
+        if (local && local.length) {
+          payload = {
+            nodes: store.nodes,
+            departments: store.departments,
+            customFields: store.customFields,
+          };
+        } else {
+          let nodes: any[] = [];
+          try {
+            const res = await fetch('/sample-data.json');
+            if (res.ok) nodes = await res.json();
+          } catch {
+            /* ignore */
+          }
+          payload = { nodes, departments: {}, customFields: [] };
+        }
+        const created = await api.createChart({ name: 'Mein erster Chart', payload });
+        charts = [created];
+      }
+
+      // Step 4: pick which chart to load
+      const lastId = store.loadCurrentChartId();
+      const target =
+        (lastId && charts.find((c) => c.id === lastId)) ||
+        charts.find((c) => c.default) ||
+        charts[0];
+
+      // Step 5: fetch payload + ETag
+      const fetched = await api.getChart(target.id);
+      store.setCurrentChart(target.id);
+      store.loadFromPayload(fetched.payload, fetched.etag);
+      // Per-chart user-state (positions / layout-mode) is namespaced and
+      // loaded separately; this picks them up after currentChartId is set.
+      store.load();
+      return store.nodes;
+    } catch (err: any) {
+      console.warn('API mode failed, falling back to localStorage', err);
+      store.apiAvailable = false;
+    }
+  }
+
+  // Offline / no backend — legacy localStorage path.
   const cached = store.load();
   if (cached && cached.length) return cached;
 
@@ -132,6 +191,110 @@ async function loadInitialData() {
   ];
   store.set(fallback);
   return fallback;
+}
+
+/* -------------------------------------------------------------------- */
+/*  API sync — debounced PUT triggered after every store.save()          */
+/* -------------------------------------------------------------------- */
+
+let syncTimer: any = null;
+let syncInFlight = false;
+let pendingDuringFlight = false;
+
+async function flushApiSync(): Promise<void> {
+  if (!store.apiAvailable || !store.currentChartId || !store.currentChartEtag) return;
+  if (syncInFlight) {
+    pendingDuringFlight = true;
+    return;
+  }
+  syncInFlight = true;
+  const payload: ChartPayload = {
+    nodes: JSON.parse(JSON.stringify(store.nodes)),
+    departments: JSON.parse(JSON.stringify(store.departments)),
+    customFields: JSON.parse(JSON.stringify(store.customFields)),
+  };
+  try {
+    const result = await api.putChart(store.currentChartId, store.currentChartEtag, payload);
+    store.currentChartEtag = result.etag;
+  } catch (err: any) {
+    if (err?.status === 412 && err?.conflict) {
+      const localStats = {
+        nodes: store.nodes.length,
+        departments: Object.keys(store.departments).length,
+      };
+      const resolution = await showConflict({
+        serverEntry: err.conflict,
+        localPayload: payload,
+        localStats,
+      });
+      if (resolution.resolution === 'reload-server') {
+        store.loadFromPayload(resolution.payload, resolution.etag);
+        rerender();
+        toast('Server-Version geladen');
+      } else if (resolution.resolution === 'force-local') {
+        store.currentChartEtag = resolution.etag;
+        toast('Eigene Version durchgesetzt');
+      }
+    } else if (err?.status === 404) {
+      toast('Dieser Chart existiert nicht mehr — bitte einen anderen wählen.', 'error', 6000);
+      store.apiAvailable = false;
+    } else {
+      console.warn('API sync failed', err);
+    }
+  } finally {
+    syncInFlight = false;
+    if (pendingDuringFlight) {
+      pendingDuringFlight = false;
+      // A new save() came in while we were flying. Schedule the next pass.
+      debouncedApiSync();
+    }
+  }
+}
+
+function debouncedApiSync(): void {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(flushApiSync, 500);
+}
+
+/** Switch the active chart — fetch payload, swap into store, rerender. */
+async function loadChartIntoStore(id: string): Promise<void> {
+  if (!store.apiAvailable) return;
+  try {
+    const fetched = await api.getChart(id);
+    // Persist any pending sync before swapping the chart so we don't lose
+    // unsaved local changes from the previous chart.
+    if (syncTimer) {
+      clearTimeout(syncTimer);
+      await flushApiSync();
+    }
+    store.setCurrentChart(id);
+    store.loadFromPayload(fetched.payload, fetched.etag);
+    // Pick up the per-chart user-state (positions, layout mode).
+    store.layoutMode = 'auto';
+    store.manualPositions = {};
+    store.load();
+    rerender();
+    history?.reset(store.snapshot());
+    syncLayoutToggleUI();
+    toast(`„${fetched.entry.name}" geladen`);
+    updateCurrentChartLabel(fetched.entry.name);
+  } catch (err: any) {
+    toast('Chart konnte nicht geladen werden: ' + (err?.message ?? err), 'error');
+  }
+}
+
+function updateCurrentChartLabel(name: string | null): void {
+  const btn = document.getElementById('btn-workspaces') as HTMLButtonElement | null;
+  if (!btn) return;
+  if (name) btn.innerHTML = `🗂 ${escapeForLabel(name)}`;
+  else btn.textContent = '🗂 Charts';
+}
+
+function escapeForLabel(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 function bindToolbar() {
@@ -569,6 +732,43 @@ async function bootstrap() {
 
   // Stats sidebar — opens via the toolbar's 📊 button.
   setupStatsSidebar();
+
+  // Workspaces — only enabled when a backend is reachable.
+  if (store.apiAvailable) {
+    const wsBtn = document.getElementById('btn-workspaces') as HTMLButtonElement | null;
+    if (wsBtn) {
+      wsBtn.hidden = false;
+      // Show the active chart's name on the button so the user always
+      // knows which chart they're editing.
+      try {
+        const list = await api.listCharts();
+        const active = list.find((c) => c.id === store.currentChartId);
+        if (active) updateCurrentChartLabel(active.name);
+      } catch {
+        /* ignore */
+      }
+    }
+    workspaces = setupWorkspaces({
+      store,
+      onLoadChart: loadChartIntoStore,
+      onIndexChanged: async () => {
+        try {
+          const list = await api.listCharts();
+          const active = list.find((c) => c.id === store.currentChartId);
+          if (active) updateCurrentChartLabel(active.name);
+        } catch {
+          /* ignore */
+        }
+      },
+      toast,
+    });
+    // Wire the debounced API sync into store.save().
+    store._apiSync = debouncedApiSync;
+  } else {
+    // Backend not reachable — leave the chart-management button hidden,
+    // but tell the user once on startup so they know they're offline.
+    toast('Offline-Modus — kein Backend erreichbar', 'info', 3000);
+  }
 
   // Layout-mode toggle — initialises the toolbar label, the chart-host
   // class and (if applicable) the drag handler from the persisted state.

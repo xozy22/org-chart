@@ -2,13 +2,24 @@
 
 [![Build & Publish Container](https://github.com/xozy22/org-chart/actions/workflows/docker.yml/badge.svg)](https://github.com/xozy22/org-chart/actions/workflows/docker.yml)
 
-A browser-based organisational chart builder. TypeScript + [d3-org-chart](https://github.com/bumbeishvili/org-chart), served from a tiny nginx container.
+A browser-based organisational chart builder. TypeScript + [d3-org-chart](https://github.com/bumbeishvili/org-chart) for the SPA, an optional Express backend for shared multi-chart storage. Runs as one container alone, or two with `docker compose`.
 
 ![Org-Chart Builder screenshot](docs/screenshot-app.png)
 
 ---
 
 ## Features
+
+### Workspaces (multi-chart)
+
+| Area | What it does |
+|---|---|
+| **Multiple charts** | When the optional backend container is reachable, the toolbar shows a `🗂 <chart name>` button. Click it to open a modal that lists every chart with its tags, size and last-updated timestamp. |
+| **CRUD on the workspace** | Create a new chart, rename, edit tags, duplicate (with content), delete. The active chart is highlighted; ★ flips the default — the chart loaded on the next visit. |
+| **Tag filter + search** | Free-text search filters by name and tag; tag chips toggle as multi-select filters. |
+| **Optimistic locking** | Every save sends an `If-Match: <etag>` header. If two users edit the same chart concurrently, the second one to save sees a conflict modal with three resolutions: load server version, force-push local version, or cancel. |
+| **Per-chart user state** | Free-layout positions and the `auto`/`free` mode are stored per-chart in `localStorage` so each viewer has their own view onto the same shared content. |
+| **Offline mode** | If the backend isn't reachable at boot, the app falls back to single-chart `localStorage` mode and the workspace button stays hidden. |
 
 ### Cards & data
 
@@ -81,33 +92,62 @@ npm run type-check   # standalone TypeScript check (CI-friendly)
 
 ## Run with Docker
 
-The published image is multi-stage (Node build → nginx runtime) and tiny — based on `nginx:1.27-alpine`.
+Two containers are published:
+
+| Image | Purpose |
+|---|---|
+| `ghcr.io/xozy22/org-chart` | nginx-served SPA. Standalone in single-chart mode, or proxies `/api/` to the backend. |
+| `ghcr.io/xozy22/org-chart-backend` | Express + filesystem-based shared chart storage. Optional. |
+
+### Single-container, single chart (legacy mode)
 
 ```bash
-# Pull & run the latest published image
 docker run --rm -p 8080:80 ghcr.io/xozy22/org-chart:latest
 ```
 
-Open <http://localhost:8080>.
+Open <http://localhost:8080>. Chart lives in your browser's `localStorage` only.
 
-### Build the image yourself
+### Both containers, multi-chart with shared backend
+
+```bash
+docker compose up -d
+# → http://localhost:8080
+```
+
+The bundled `docker-compose.yml` boots both services and bind-mounts `./data` for chart persistence. Charts created in the workspace UI are written to `./data/charts/<id>.json`; the index lives in `./data/charts.index.json`.
+
+### Build images yourself
 
 ```bash
 docker build -t org-chart:local .
-docker run --rm -p 8080:80 org-chart:local
+docker build -t org-chart-backend:local ./backend
 ```
 
 ### Multi-arch
 
-The CI publishes both `linux/amd64` and `linux/arm64`, so the image runs unmodified on Apple Silicon and Raspberry Pi 5.
+The CI publishes both `linux/amd64` and `linux/arm64` for both images, so they run unmodified on Apple Silicon and Raspberry Pi 5.
 
 ---
 
 ## Where is the chart stored?
 
-**Inside the user's browser, not the container.** The container is fully
-stateless — it only serves static files. Every chart edit is persisted
-to the browser's `localStorage` under five keys:
+**It depends on the deployment shape:**
+
+### With the backend container running
+
+| What | Where | Notes |
+|---|---|---|
+| Chart payloads (nodes, departments, custom-fields schema) | `./data/charts/<id>.json` (host volume mounted into the backend) | Shared across all users hitting the same backend |
+| Index & metadata (name, tags, default flag, ETag) | `./data/charts.index.json` | Single file, atomic writes |
+| Free-layout positions | Browser `localStorage` (`orgchart.positions.v1.<chart-id>`) | Per-user; everyone sees the same chart but their own placement |
+| `auto` / `free` mode | Browser `localStorage` (`orgchart.layoutmode.v1.<chart-id>`) | Per-user |
+| Active chart | Browser `localStorage` (`orgchart.currentChartId`) | So a reload returns to the same chart |
+| Undo/redo history | In-memory only | Lost on tab refresh |
+
+### Without the backend (single-container mode)
+
+The container is fully stateless — it only serves static files. Every
+chart edit is persisted to the browser's `localStorage` under five keys:
 
 | Key | Contents |
 |---|---|
@@ -229,34 +269,61 @@ Any number of nodes can have `parentId: null`. Internally a virtual super-root i
 
 ---
 
+## REST API
+
+When the backend is running it exposes a single resource:
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET`    | `/api/charts`     | Index — every chart's metadata (no payload) |
+| `POST`   | `/api/charts`     | Body `{name, tags?, payload?}` → 201 with new entry |
+| `GET`    | `/api/charts/:id` | Body `{entry, payload}` + `ETag` header |
+| `PUT`    | `/api/charts/:id` | `If-Match: <etag>` required → 200 or 412 (conflict) |
+| `PATCH`  | `/api/charts/:id` | Body `{name?, tags?, default?}` |
+| `DELETE` | `/api/charts/:id` | Auto-promotes oldest as new default if needed; surfaces it via `X-New-Default` header |
+| `GET`    | `/api/healthz`    | Liveness probe |
+
+ETags are 7-character SHA-1 prefixes over the canonical payload — clients hold the value from the last `GET`/`PUT` and round-trip it as `If-Match` for optimistic locking.
+
 ## Project structure
 
 ```
 .
-├── Dockerfile              # multi-stage build → nginx
-├── nginx.conf              # SPA fallback, gzip, asset caching
-├── docker-compose.yml      # one-shot run with optional seed-volume
-├── tsconfig.json           # TypeScript in pragmatic relaxed mode
-├── .github/workflows/      # CI: build & push to GHCR
-├── public/sample-data.json # demo dataset
-└── src/
-    ├── main.ts             # bootstrap, toolbar wiring, toasts
-    ├── chart.ts            # OrgChart instance, virtual-root logic, node template
-    ├── store.ts            # state + localStorage + subscribers (used by undo/redo)
-    ├── history.ts          # 50-step undo/redo stack
-    ├── types.ts            # OrgNode, CustomField, Snapshot, ChartStats, …
-    ├── crud.ts             # add/edit/delete modal logic
-    ├── customFields.ts     # custom-field schema editor (settings modal)
-    ├── filters.ts          # search + filter (dept/country/root) + dimming
-    ├── selection.ts        # multi-select state + visual sync
-    ├── freeLayout.ts       # free-mode drag, snap, link redraw, transform watcher
-    ├── minimap.ts          # bottom-right canvas overview
-    ├── stats.ts            # aggregations (counts, depth, completeness)
-    ├── exporter.ts         # PNG / SVG / PDF export with inlined CSS & flags
-    ├── io.ts               # JSON / CSV import & export
-    ├── countries.ts        # ISO-3166 list + name resolver
-    ├── departments.ts      # hash-color helper + WCAG text colour
-    └── styles.css          # Fortinet-inspired theme
+├── Dockerfile               # frontend: multi-stage build → nginx
+├── nginx.conf               # SPA fallback + /api/ proxy_pass
+├── docker-compose.yml       # frontend + backend with shared ./data volume
+├── tsconfig.json            # TypeScript in pragmatic relaxed mode
+├── .github/workflows/       # matrix CI: builds + pushes both images
+├── public/sample-data.json  # demo dataset (loaded on first visit)
+├── backend/                 # OPTIONAL — Node + Express chart storage
+│   ├── Dockerfile
+│   ├── tsconfig.json
+│   └── src/
+│       ├── server.ts        # express bootstrap, CORS, error handler
+│       ├── routes/charts.ts # REST endpoints
+│       ├── storage.ts       # file-based store with ETag + mutex
+│       └── types.ts         # ChartIndexEntry, ChartPayload
+└── src/                     # frontend SPA
+    ├── main.ts              # bootstrap, toolbar wiring, API sync, toasts
+    ├── api.ts               # fetch client + ETag round-tripping
+    ├── workspaces.ts        # multi-chart modal (list, search, CRUD)
+    ├── conflict.ts          # 412 conflict modal with diff
+    ├── chart.ts             # OrgChart instance, virtual-root logic, node template
+    ├── store.ts             # state + localStorage + subscribers (used by undo/redo)
+    ├── history.ts           # 50-step undo/redo stack
+    ├── types.ts             # OrgNode, CustomField, ChartIndexEntry, …
+    ├── crud.ts              # add/edit/delete modal logic
+    ├── customFields.ts      # custom-field schema editor (settings modal)
+    ├── filters.ts           # search + filter (dept/country/root) + dimming
+    ├── selection.ts         # multi-select state + visual sync
+    ├── freeLayout.ts        # free-mode drag, snap, link redraw, transform watcher
+    ├── minimap.ts           # bottom-right canvas overview
+    ├── stats.ts             # aggregations (counts, depth, completeness)
+    ├── exporter.ts          # PNG / SVG / PDF export with inlined CSS & flags
+    ├── io.ts                # JSON / CSV import & export
+    ├── countries.ts         # ISO-3166 list + name resolver
+    ├── departments.ts       # hash-color helper + WCAG text colour
+    └── styles.css           # Fortinet-inspired theme
 ```
 
 ---

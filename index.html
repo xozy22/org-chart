@@ -15,6 +15,7 @@
         <button id="btn-expand-all" class="btn" title="Alle ausklappen">Alle aufklappen</button>
         <button id="btn-collapse-all" class="btn" title="Alle einklappen">Alle einklappen</button>
         <button id="btn-layout-mode" class="btn" title="Layout-Modus umschalten">🔀 Auto</button>
+        <button id="btn-workspaces" class="btn" title="Charts verwalten" aria-label="Charts verwalten" hidden>🗂 Charts</button>
         <button id="btn-settings" class="btn btn-icon" title="Eigene Felder verwalten" aria-label="Eigene Felder verwalten">⚙</button>
         <button id="btn-stats" class="btn btn-icon" title="Statistiken anzeigen" aria-label="Statistiken anzeigen">📊</button>
       </div>
@@ -207,6 +208,44 @@
             <button type="submit" class="btn btn-primary">Speichern</button>
           </footer>
         </form>
+      </div>
+    </div>
+
+    <!-- Workspaces — chart selection / management -->
+    <div id="workspaces-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-dialog modal-dialog--wide">
+        <header class="modal-header">
+          <h2>Charts verwalten</h2>
+          <button class="modal-close" data-close aria-label="Schließen">×</button>
+        </header>
+        <div class="modal-body">
+          <div class="ws-toolbar">
+            <input type="search" id="workspaces-search" placeholder="🔍 Suche nach Name oder Tag…" autocomplete="off" />
+            <div class="ws-tag-bar">
+              <span class="ws-tag-label">Tags:</span>
+              <span id="workspaces-tag-filter" class="ws-tag-list"></span>
+            </div>
+          </div>
+          <div id="workspaces-body" class="ws-body"></div>
+        </div>
+        <footer class="modal-footer">
+          <span class="spacer"></span>
+          <button type="button" id="workspaces-new" class="btn btn-primary">+ Neuer Chart</button>
+          <button type="button" class="btn" data-close>Schließen</button>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Conflict resolution modal (shown on PUT 412) -->
+    <div id="conflict-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-dialog">
+        <header class="modal-header">
+          <h2>⚠ Speicher-Konflikt</h2>
+          <button class="modal-close" data-close aria-label="Schließen">×</button>
+        </header>
+        <div id="conflict-body" class="modal-body"></div>
       </div>
     </div>
 

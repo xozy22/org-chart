@@ -137,9 +137,11 @@ export function applyManualPositions(chart: any, store: any): void {
   if (dirty) {
     // Persist the seeded positions, but don't trigger the change listeners
     // (we'd loop with the history module). save() emits — so use the
-    // localStorage-only path manually.
+    // localStorage-only path manually. The key is per-chart so view state
+    // doesn't bleed across charts.
+    const sx = store.currentChartId ? `.${store.currentChartId}` : '';
     try {
-      localStorage.setItem('orgchart.positions.v1', JSON.stringify(positions));
+      localStorage.setItem('orgchart.positions.v1' + sx, JSON.stringify(positions));
     } catch {
       /* ignore */
     }

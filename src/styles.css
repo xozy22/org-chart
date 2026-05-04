@@ -737,6 +737,229 @@ svg path.link,
 }
 
 /* =========================================================
+   Workspaces modal — table of charts
+   ========================================================= */
+.ws-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+#workspaces-search {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: white;
+  font-size: 14px;
+  width: 100%;
+}
+
+#workspaces-search:focus {
+  outline: none;
+  border-color: var(--ft-red);
+  box-shadow: 0 0 0 3px rgba(218, 41, 28, 0.18);
+}
+
+.ws-tag-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ws-tag-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ws-tag-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ws-tag {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: white;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.ws-tag:hover { border-color: var(--ft-graphite); }
+.ws-tag.is-active {
+  background: var(--ft-red);
+  border-color: var(--ft-red);
+  color: white;
+}
+.ws-tag-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.ws-body { max-height: 50vh; overflow-y: auto; }
+
+.ws-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ws-table thead th {
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+}
+.ws-table tbody td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.ws-table tbody tr:hover {
+  background: var(--bg);
+}
+.ws-table tbody tr.is-current {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.ws-default-toggle {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  font-size: 17px;
+  color: var(--border-strong);
+  cursor: pointer;
+  padding: 0;
+  border-radius: var(--radius-sm);
+}
+.ws-default-toggle:hover { color: #fbbf24; background: var(--bg); }
+.ws-default-toggle.is-default { color: #fbbf24; }
+
+.ws-name-link {
+  border: none;
+  background: transparent;
+  color: var(--ft-black);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ws-name-link:hover { color: var(--ft-red); text-decoration: underline; }
+
+.ws-active-pill {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: white;
+  background: #2563eb;
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.ws-tag-chip {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.ws-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ws-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.ws-action {
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  cursor: pointer;
+  margin-left: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+.ws-action:hover { background: white; border-color: var(--border-strong); color: var(--text); }
+.ws-action-danger:hover { background: var(--ft-red); border-color: var(--ft-red); color: white; }
+
+.ws-empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* =========================================================
+   Conflict resolution modal
+   ========================================================= */
+.conflict-lead { margin: 0 0 14px; font-size: 14px; line-height: 1.5; color: var(--text); }
+
+.conflict-diff {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.conflict-diff thead th {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.conflict-diff tbody th {
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.conflict-diff tbody td {
+  padding: 8px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.conflict-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.conflict-options .btn { flex: 1 1 auto; }
+
+/* =========================================================
    Stats sidebar — slides in from the right
    ========================================================= */
 .stats-sidebar {

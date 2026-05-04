@@ -1,11 +1,19 @@
 import { defaultDepartmentColor } from './departments.js';
-import type { OrgNode, NodeId, CustomField, Snapshot, LayoutMode, Position } from './types.js';
+import type { OrgNode, NodeId, CustomField, Snapshot, LayoutMode, Position, ChartPayload } from './types.js';
 
 const STORAGE_KEY = 'orgchart.data.v1';
 const DEPT_KEY = 'orgchart.departments.v1';
 const CUSTOM_FIELDS_KEY = 'orgchart.customfields.v1';
 const LAYOUT_MODE_KEY = 'orgchart.layoutmode.v1';
 const POSITIONS_KEY = 'orgchart.positions.v1';
+/** localStorage key for the active chart's id (only relevant in API mode). */
+const CURRENT_CHART_KEY = 'orgchart.currentChartId';
+
+/** Build a per-chart localStorage key suffix so nutzer-spezifische
+ *  view-state (free positions, layout mode) doesn't bleed across charts. */
+function suffix(chartId: string | null | undefined): string {
+  return chartId ? `.${chartId}` : '';
+}
 
 /** Built-in node fields that user-defined custom fields must not shadow. */
 const RESERVED_FIELD_KEYS: Set<string> = new Set([
@@ -31,6 +39,24 @@ export const store = {
 
   /** Per-node x/y overrides applied in free-layout mode. Keys are node IDs. */
   manualPositions: {} as Record<NodeId, Position>,
+
+  /** ID of the chart currently loaded — `null` when running in single-chart
+   *  legacy mode (no backend). Persisted in localStorage so reloads keep
+   *  the user on the same chart. */
+  currentChartId: null as string | null,
+
+  /** Last ETag we know about for the current chart. Updated on every API
+   *  load/save and sent back as `If-Match` for optimistic locking. */
+  currentChartEtag: null as string | null,
+
+  /** True when bootstrap detected a reachable backend. The toolbar's
+   *  Workspaces button is enabled accordingly, and `save()` syncs to the
+   *  API in addition to localStorage. */
+  apiAvailable: false,
+
+  /** Set by main.ts to a debounced PUT helper. Called after every save()
+   *  when API mode is active. */
+  _apiSync: null as null | (() => void),
 
   /** Subscribers notified on every mutation that changes persistent state.
    *  Used by the history module to record snapshots for undo/redo. */
@@ -78,12 +104,13 @@ export const store = {
     if (snap.manualPositions) {
       this.manualPositions = JSON.parse(JSON.stringify(snap.manualPositions));
     }
+    const sx = suffix(this.currentChartId);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.nodes));
       localStorage.setItem(DEPT_KEY, JSON.stringify(this.departments));
       localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(this.customFields));
-      localStorage.setItem(LAYOUT_MODE_KEY, this.layoutMode);
-      localStorage.setItem(POSITIONS_KEY, JSON.stringify(this.manualPositions));
+      localStorage.setItem(LAYOUT_MODE_KEY + sx, this.layoutMode);
+      localStorage.setItem(POSITIONS_KEY + sx, JSON.stringify(this.manualPositions));
     } catch (err) {
       console.warn('localStorage persist failed', err);
     }
@@ -165,8 +192,15 @@ export const store = {
     } catch {
       /* ignore */
     }
+    // Per-chart view state (free positions, layout mode) is keyed by the
+    // active chart so wechseln zwischen charts uns die manuellen Positionen
+    // nicht durcheinanderwürfeln. Falls noch keine chart-id da ist, lesen
+    // wir die unscoped legacy keys.
+    const sx = suffix(this.currentChartId);
     try {
-      const rawMode = localStorage.getItem(LAYOUT_MODE_KEY);
+      const rawMode =
+        localStorage.getItem(LAYOUT_MODE_KEY + sx) ??
+        localStorage.getItem(LAYOUT_MODE_KEY);
       if (rawMode === 'free' || rawMode === 'auto') {
         this.layoutMode = rawMode;
       }
@@ -174,7 +208,9 @@ export const store = {
       /* ignore */
     }
     try {
-      const rawPos = localStorage.getItem(POSITIONS_KEY);
+      const rawPos =
+        localStorage.getItem(POSITIONS_KEY + sx) ??
+        localStorage.getItem(POSITIONS_KEY);
       if (rawPos) {
         const parsed = JSON.parse(rawPos);
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -187,19 +223,70 @@ export const store = {
     return nodes;
   },
 
-  save() {
+  /**
+   * Replace state from a server-side payload. Used after fetching a chart
+   * from the API or right after creating one. Mirrors `restore` but does
+   * not touch the per-chart view state (positions, layout mode), which
+   * stays user-specific.
+   */
+  loadFromPayload(payload: ChartPayload, etag: string | null = null) {
+    this.nodes = JSON.parse(JSON.stringify(payload.nodes ?? []));
+    this.departments = JSON.parse(JSON.stringify(payload.departments ?? {}));
+    this.customFields = JSON.parse(JSON.stringify(payload.customFields ?? []));
+    if (etag !== null) this.currentChartEtag = etag;
+    // Cache the payload in localStorage so an offline reload still works.
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.nodes));
       localStorage.setItem(DEPT_KEY, JSON.stringify(this.departments));
       localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(this.customFields));
-      localStorage.setItem(LAYOUT_MODE_KEY, this.layoutMode);
-      localStorage.setItem(POSITIONS_KEY, JSON.stringify(this.manualPositions));
+    } catch {
+      /* ignore */
+    }
+  },
+
+  /** Set/clear the active chart id and persist it for next reload. */
+  setCurrentChart(id: string | null) {
+    this.currentChartId = id;
+    try {
+      if (id) localStorage.setItem(CURRENT_CHART_KEY, id);
+      else localStorage.removeItem(CURRENT_CHART_KEY);
+    } catch {
+      /* ignore */
+    }
+  },
+
+  /** Get the persisted last-active chart id (or null on first run). */
+  loadCurrentChartId(): string | null {
+    try {
+      return localStorage.getItem(CURRENT_CHART_KEY);
+    } catch {
+      return null;
+    }
+  },
+
+  save() {
+    const sx = suffix(this.currentChartId);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.nodes));
+      localStorage.setItem(DEPT_KEY, JSON.stringify(this.departments));
+      localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(this.customFields));
+      // Per-chart user-state — namespaced when we know which chart we're in.
+      localStorage.setItem(LAYOUT_MODE_KEY + sx, this.layoutMode);
+      localStorage.setItem(POSITIONS_KEY + sx, JSON.stringify(this.manualPositions));
     } catch (err) {
       console.warn('localStorage persist failed', err);
     }
     // Notify subscribers AFTER persistence so anyone listening can
     // rely on localStorage being up to date (e.g. history snapshots).
     this._emit();
+    // Trigger backend sync (debounced in main.ts) when we're in API mode.
+    if (this.apiAvailable && this._apiSync) {
+      try {
+        this._apiSync();
+      } catch (err) {
+        console.warn('API sync trigger failed', err);
+      }
+    }
   },
 
   set(nodes) {
