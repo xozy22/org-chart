@@ -91,6 +91,39 @@ function vcardEscape(value: string): string {
     .replace(/;/g, '\\;');
 }
 
+/** Sanitize a name for use as a filename — same rules as io.ts. */
+function sanitizeForFilename(raw: string | null | undefined): string {
+  if (!raw) return 'contact';
+  const cleaned = String(raw)
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 80)
+    .trim();
+  return cleaned || 'contact';
+}
+
+/**
+ * Trigger a `<name>.vcf` download for the given node. Uses an in-memory
+ * Blob + temporary anchor — works in every modern browser without needing
+ * a server round-trip.
+ */
+export function downloadVCard(node: OrgNode): void {
+  const vcard = formatNodeAsVCard(node);
+  // BOM helps some Windows apps detect UTF-8.
+  const blob = new Blob(['﻿', vcard], { type: 'text/vcard;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${sanitizeForFilename(node.name)}.vcf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /** Build a vCard 3.0 representation of a node — importable by most apps. */
 export function formatNodeAsVCard(node: OrgNode): string {
   const lines: string[] = [];

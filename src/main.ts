@@ -15,7 +15,7 @@ import { COUNTRIES, countryName } from './countries.js';
 import * as api from './api.js';
 import { setupWorkspaces, type WorkspacesController } from './workspaces.js';
 import { showConflict } from './conflict.js';
-import { copyText, formatNodeAsText, formatNodeAsVCard } from './clipboard.js';
+import { copyText, formatNodeAsText, downloadVCard } from './clipboard.js';
 import type { LayoutMode, ChartPayload, OrgNode } from './types.js';
 
 let chart = null;
@@ -207,18 +207,27 @@ async function copySelectedNode(format: 'text' | 'vcard'): Promise<void> {
   }
   const node = store.byId(id) as OrgNode | undefined;
   if (!node) return;
-  await copyNodeToClipboard(node, format);
+  await exportNode(node, format);
 }
 
-/** Shared core: format + write + toast. Used by card-button and toolbar-menu. */
-async function copyNodeToClipboard(node: OrgNode, format: 'text' | 'vcard'): Promise<void> {
-  const payload = format === 'vcard' ? formatNodeAsVCard(node) : formatNodeAsText(node);
-  const ok = await copyText(payload);
-  if (ok) {
-    toast(format === 'vcard' ? 'Als vCard kopiert' : 'Als Text kopiert', 'info', 1800);
-  } else {
-    toast('Kopieren fehlgeschlagen', 'error', 2400);
+/**
+ * Export a node — text → clipboard, vCard → download. Used by both the
+ * per-card popover and the toolbar's "Auswahl" menu.
+ */
+async function exportNode(node: OrgNode, format: 'text' | 'vcard'): Promise<void> {
+  if (format === 'vcard') {
+    try {
+      downloadVCard(node);
+      toast('vCard heruntergeladen', 'info', 1800);
+    } catch (err) {
+      toast('Download fehlgeschlagen', 'error', 2400);
+      console.error('vCard download failed:', err);
+    }
+    return;
   }
+  const ok = await copyText(formatNodeAsText(node));
+  if (ok) toast('Als Text kopiert', 'info', 1800);
+  else toast('Kopieren fehlgeschlagen', 'error', 2400);
 }
 
 function setLayoutMode(mode: LayoutMode) {
@@ -649,8 +658,8 @@ function setupCardCopyPopover(): void {
     if (!id) return;
     const node = store.byId(id) as OrgNode | undefined;
     if (!node) return;
-    if (action === 'copy-as-text') await copyNodeToClipboard(node, 'text');
-    else if (action === 'copy-as-vcard') await copyNodeToClipboard(node, 'vcard');
+    if (action === 'copy-as-text') await exportNode(node, 'text');
+    else if (action === 'copy-as-vcard') await exportNode(node, 'vcard');
   });
 
   // Close on outside-click and Esc — same pattern as the toolbar menus.
