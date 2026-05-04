@@ -1,6 +1,14 @@
-# Org-Chart Builder
+<p align="center">
+  <img src="public/logo.svg" alt="Org-Chart Builder logo" width="112" height="112" />
+</p>
 
-[![Build & Publish Container](https://github.com/xozy22/org-chart/actions/workflows/docker.yml/badge.svg)](https://github.com/xozy22/org-chart/actions/workflows/docker.yml)
+<h1 align="center">Org-Chart Builder</h1>
+
+<p align="center">
+  <a href="https://github.com/xozy22/org-chart/actions/workflows/docker.yml">
+    <img src="https://github.com/xozy22/org-chart/actions/workflows/docker.yml/badge.svg" alt="Build & Publish Container" />
+  </a>
+</p>
 
 A browser-based organisational chart builder. TypeScript + [d3-org-chart](https://github.com/bumbeishvili/org-chart) for the SPA, a small Express backend for shared multi-chart storage. Ships as **one Docker image, one process, one port** — point a host directory at `/app/data` and you're done.
 
