@@ -9,6 +9,7 @@
  * - `formatNodeAsVCard` produces an RFC-6350 vCard 3.0 string, ready to
  *   import into address books like Outlook, Apple Contacts, or Google.
  */
+import JSZip from 'jszip';
 import type { OrgNode } from './types.js';
 import { store } from './store.js';
 import { countryName } from './countries.js';
@@ -92,7 +93,7 @@ function vcardEscape(value: string): string {
 }
 
 /** Sanitize a name for use as a filename — same rules as io.ts. */
-function sanitizeForFilename(raw: string | null | undefined): string {
+export function sanitizeForFilename(raw: string | null | undefined): string {
   if (!raw) return 'contact';
   const cleaned = String(raw)
     // eslint-disable-next-line no-control-regex
@@ -118,6 +119,56 @@ export function downloadVCard(node: OrgNode): void {
   const a = document.createElement('a');
   a.href = url;
   a.download = `${sanitizeForFilename(node.name)}.vcf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * Bundle several nodes' vCards into a ZIP and trigger a download.
+ *
+ *   <zipBaseName>_<YYYY-MM-DD>.zip
+ *     ├── Anna_Mueller.vcf
+ *     ├── Bob_Smith.vcf
+ *     └── ...
+ *
+ * Files with colliding names get an `_2`, `_3`, … suffix so nothing is
+ * silently overwritten. Address-book apps import every .vcf in one go
+ * if you point them at the unzipped folder.
+ */
+export async function downloadVCardsAsZip(
+  nodes: OrgNode[],
+  zipBaseName: string = 'vcards',
+): Promise<void> {
+  if (nodes.length === 0) return;
+
+  const zip = new JSZip();
+  const used = new Set<string>();
+  for (const node of nodes) {
+    const baseName = sanitizeForFilename(node.name);
+    let filename = `${baseName}.vcf`;
+    let i = 2;
+    while (used.has(filename.toLowerCase())) {
+      filename = `${baseName}_${i}.vcf`;
+      i++;
+    }
+    used.add(filename.toLowerCase());
+    // BOM helps some Windows apps detect UTF-8.
+    zip.file(filename, '﻿' + formatNodeAsVCard(node));
+  }
+
+  const blob = await zip.generateAsync({
+    type: 'blob',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 6 },
+  });
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const safeBase = sanitizeForFilename(zipBaseName);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${safeBase}_${dateStr}.zip`;
   document.body.appendChild(a);
   a.click();
   a.remove();

@@ -15,7 +15,12 @@ import { COUNTRIES, countryName } from './countries.js';
 import * as api from './api.js';
 import { setupWorkspaces, type WorkspacesController } from './workspaces.js';
 import { showConflict } from './conflict.js';
-import { copyText, formatNodeAsText, downloadVCard } from './clipboard.js';
+import {
+  copyText,
+  formatNodeAsText,
+  downloadVCard,
+  downloadVCardsAsZip,
+} from './clipboard.js';
 import type { LayoutMode, ChartPayload, OrgNode } from './types.js';
 
 let chart = null;
@@ -190,24 +195,58 @@ function handleMenuAction(action: string): void {
 }
 
 /**
- * Copy the currently selected node (or the only node, if there's just one)
- * as text or vCard. Falls back with a toast hint when nothing is selected.
+ * Export the currently selected node(s) as text (clipboard) or vCard.
+ * Single selection → single .vcf or one node's text; multi-select → ZIP
+ * of .vcfs or concatenated text. Falls back to "the only node" if
+ * nothing is explicitly selected.
  */
 async function copySelectedNode(format: 'text' | 'vcard'): Promise<void> {
   const ids = selection?.getAll?.() ?? [];
-  let id: string | null = ids[0] ?? null;
-  if (!id) {
-    // No selection — try the only node, otherwise nudge the user.
+
+  // Resolve the target list of nodes.
+  let nodes: OrgNode[] = [];
+  if (ids.length > 0) {
+    nodes = ids
+      .map((id) => store.byId(id) as OrgNode | undefined)
+      .filter((n): n is OrgNode => !!n);
+  } else {
+    // No explicit selection — fall back to the only node, otherwise hint.
     const all = store.get();
-    if (all.length === 1) id = String(all[0].id);
-    else {
-      toast('Bitte zuerst einen Knoten markieren (Strg+Klick)', 'info', 2400);
-      return;
+    if (all.length === 1) {
+      const only = store.byId(String(all[0].id)) as OrgNode | undefined;
+      if (only) nodes = [only];
     }
   }
-  const node = store.byId(id) as OrgNode | undefined;
-  if (!node) return;
-  await exportNode(node, format);
+
+  if (nodes.length === 0) {
+    toast('Bitte zuerst einen oder mehrere Knoten markieren (Strg+Klick)', 'info', 2400);
+    return;
+  }
+
+  // Single node — reuse the per-node export path.
+  if (nodes.length === 1) {
+    await exportNode(nodes[0], format);
+    return;
+  }
+
+  // Multi-select.
+  if (format === 'vcard') {
+    try {
+      const zipBase = activeChartName ? `${activeChartName}_vcards` : 'vcards';
+      await downloadVCardsAsZip(nodes, zipBase);
+      toast(`${nodes.length} vCards als ZIP heruntergeladen`, 'info', 2000);
+    } catch (err) {
+      toast('ZIP-Download fehlgeschlagen', 'error', 2400);
+      console.error('vCard ZIP download failed:', err);
+    }
+    return;
+  }
+
+  // Text → join with separators, then clipboard.
+  const blob = nodes.map(formatNodeAsText).join('\n\n— — —\n\n');
+  const ok = await copyText(blob);
+  if (ok) toast(`${nodes.length} Knoten als Text kopiert`, 'info', 1800);
+  else toast('Kopieren fehlgeschlagen', 'error', 2400);
 }
 
 /**
