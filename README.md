@@ -129,6 +129,12 @@ the backend creates two things:
     └── …
 ```
 
+> 💡 **Drop-in import** — any `*.json` file you copy into `<data>/charts/`
+> is auto-imported on startup *and* live while the container runs (file
+> watcher). Filenames that aren't already UUIDs get renamed to the
+> minted UUID; the original filename becomes the chart's display name.
+> See [Drop-in import](#drop-in-import-auto-discover-json-files) below.
+
 The host path is up to you. Pick whichever pattern fits:
 
 ### Bind-mount a host folder (most common)
@@ -197,19 +203,77 @@ services:
 
 …and `chown -R 1000:1000 /srv/org-chart/data`.
 
-### Seeding & backup
+### Drop-in import (auto-discover JSON files)
 
-The folder is just JSON files — operate on it like any other dataset:
+The backend automatically picks up any `*.json` file you drop into
+`<data>/charts/`. Two paths to do it:
+
+**1. Bulk seed before first start** — perfect for a fresh installation
+where you already have a few exports:
+
+```bash
+mkdir -p data/charts
+cp ~/exports/acme-corp.json     data/charts/
+cp ~/exports/eu-operations.json data/charts/
+
+docker compose up -d
+# Container log:
+#   [auto-import] boot scan: imported 2 chart(s)
+#   [auto-import]   + acme-corp     (acme-corp.json     → 7d4a…)
+#   [auto-import]   + eu-operations (eu-operations.json → 9c81…)
+```
+
+Both charts are immediately visible in the workspace modal. The first
+auto-imported chart becomes the default; rename / re-tag / re-default
+from the UI as usual.
+
+**2. Live drop while the container is running** — chokidar watches the
+directory, so:
+
+```bash
+cp another-chart.json /srv/org-chart/data/charts/
+# ~1 second later, no restart needed:
+#   [auto-import] live reconcile: imported=1 renamed=1 skipped=0
+#   [auto-import]   + another-chart  (another-chart.json → 4e2f…)
+```
+
+**What gets accepted as a payload** — both forms produced by the app's
+own JSON export work:
+
+```jsonc
+// v3 envelope (what the toolbar's "Datei → JSON exportieren" produces)
+{ "version": 3, "nodes": [...], "departments": {...}, "customFields": [...] }
+
+// or the bare ChartPayload shape
+{ "nodes": [...], "departments": {...}, "customFields": [...] }
+```
+
+A bare array of nodes also works (legacy v0 format). Anything that
+doesn't smell like a chart is skipped with a warning — never deleted.
+
+**Filename → ID rules**:
+
+- Filename is already a UUID (`9c812ab8-…-….json`) → kept as the chart ID
+- Anything else (`acme.json`, `EU Operations.json`) → backend mints a
+  fresh UUID, **renames the file** to `<uuid>.json`, and uses the
+  original filename (without `.json`) as the chart's display name
+
+That rename is the only side-effect on the host filesystem; it makes
+the layout uniform and avoids ID collisions if you later drop a second
+file with the same name.
+
+### Backup & restore
+
+The folder is just JSON. Standard tools work:
 
 - **Backup**: `tar -czf charts-backup.tgz data/`
-- **Restore**: `tar -xzf charts-backup.tgz` while the container is stopped
-- **Seed from an existing chart**: drop a JSON into
-  `data/charts/<some-uuid>.json` and add a matching entry to
-  `data/charts.index.json` *before* the first start. (Easier alternative:
-  start the container, use the workspace UI's *Import* — it computes the
-  ETag and index entry for you.)
-- **Edit by hand**: stop the container, edit, restart. Avoid live edits
-  — the optimistic-lock ETag would race a manual write.
+- **Restore**: stop the container, `tar -xzf charts-backup.tgz`, start
+  again. The auto-importer will reconcile any drift between the index
+  and the files on disk.
+- **Edit by hand**: stop the container, edit, restart. Live edits to
+  active charts are *not* recommended — the optimistic-lock ETag races a
+  manual write and the first concurrent save from a browser will
+  overwrite your changes.
 
 ### Default chart for empty installs
 

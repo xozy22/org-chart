@@ -20,6 +20,8 @@ import express from 'express';
 import type { ErrorRequestHandler, Request, Response, NextFunction } from 'express';
 
 import { chartsRouter } from './routes/charts.js';
+import { reconcileFromDisk } from './storage.js';
+import { startAutoImportWatcher } from './autoImport.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*';
@@ -93,8 +95,31 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 };
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`org-chart listening on :${PORT}`);
   if (STATIC_DIR_EXISTS) console.log(`  ↳ serving SPA from ${STATIC_DIR}`);
   console.log(`  ↳ data dir: ${process.env.DATA_DIR ?? path.resolve(process.cwd(), 'data')}`);
+
+  // Auto-import: pick up any *.json files the user has dropped into the
+  // chart directory before the server started. Then watch for live changes.
+  try {
+    const result = await reconcileFromDisk();
+    if (result.imported.length) {
+      console.log(`[auto-import] boot scan: imported ${result.imported.length} chart(s)`);
+      for (const it of result.imported) {
+        console.log(`[auto-import]   + ${it.name}  (${it.from} → ${it.id})`);
+      }
+    }
+    if (result.renamed.length) {
+      console.log(`[auto-import] boot scan: renamed ${result.renamed.length} file(s) to UUID form`);
+    }
+    if (result.skipped.length) {
+      for (const sk of result.skipped) {
+        console.warn(`[auto-import]   ! skipped ${sk.file}: ${sk.reason}`);
+      }
+    }
+  } catch (err) {
+    console.error('[auto-import] boot scan failed:', err);
+  }
+  startAutoImportWatcher();
 });

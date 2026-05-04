@@ -257,6 +257,187 @@ export async function deleteChart(
 }
 
 /* --------------------------------------------------------------------- */
+/*  Auto-import: pick up loose JSON files dropped into CHART_DIR         */
+/* --------------------------------------------------------------------- */
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Expose CHART_DIR for the watcher to subscribe to. */
+export function getChartDir(): string {
+  return CHART_DIR;
+}
+
+/**
+ * Try to coerce a parsed JSON value into a `ChartPayload`. Accepts:
+ *
+ *   1. Bare ChartPayload:   { nodes, departments?, customFields? }
+ *   2. v3 envelope:         { version: 3, nodes, departments?, customFields? }
+ *   3. Bare-array (legacy): [ {id, parentId, name, …}, … ]
+ *
+ * Returns `null` when the input doesn't look like an org-chart at all.
+ */
+function normalizePayload(raw: unknown): ChartPayload | null {
+  if (Array.isArray(raw)) {
+    // Legacy: just a flat list of nodes.
+    if (raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'id' in (raw[0] as object)) {
+      return { nodes: raw as ChartPayload['nodes'], departments: {}, customFields: [] };
+    }
+    return null;
+  }
+  if (!raw || typeof raw !== 'object') return null;
+  const obj = raw as Record<string, unknown>;
+  if (!Array.isArray(obj.nodes)) return null;
+  return {
+    nodes: obj.nodes as ChartPayload['nodes'],
+    departments:
+      obj.departments && typeof obj.departments === 'object'
+        ? (obj.departments as Record<string, string>)
+        : {},
+    customFields: Array.isArray(obj.customFields)
+      ? (obj.customFields as ChartPayload['customFields'])
+      : [],
+  };
+}
+
+/** Strip `.json` and trim whitespace — used as the auto-imported chart name. */
+function nameFromFilename(filename: string): string {
+  return filename.replace(/\.json$/i, '').trim() || 'Unbenannt';
+}
+
+export interface ReconcileResult {
+  imported: { id: string; name: string; from: string }[];
+  renamed: { from: string; to: string }[];
+  skipped: { file: string; reason: string }[];
+}
+
+/**
+ * Walk CHART_DIR, find any *.json files that aren't yet referenced in the
+ * index, validate them, rename non-UUID filenames to `<uuid>.json`, and
+ * append fresh index entries. Idempotent — safe to call repeatedly.
+ *
+ * Files whose names already match an index entry are left alone (they're
+ * the steady state). Files we can't parse or that don't smell like a
+ * chart payload are skipped with a log line, never deleted.
+ */
+export async function reconcileFromDisk(): Promise<ReconcileResult> {
+  return indexMutex.run(async () => {
+    await ensureDirs();
+    const result: ReconcileResult = { imported: [], renamed: [], skipped: [] };
+
+    let dirEntries: string[];
+    try {
+      dirEntries = await fs.readdir(CHART_DIR);
+    } catch {
+      return result;
+    }
+
+    const index = await readIndex();
+    const knownIds = new Set(index.map((e) => e.id));
+    let mutated = false;
+
+    for (const entry of dirEntries) {
+      if (!entry.toLowerCase().endsWith('.json')) continue;
+      if (entry.startsWith('.')) continue; // dotfiles + tmp files
+      if (entry.includes('.tmp-')) continue; // half-written rename targets
+
+      const baseId = entry.replace(/\.json$/i, '');
+
+      // Already in the index under this filename? Steady state — skip.
+      if (UUID_RE.test(baseId) && knownIds.has(baseId)) continue;
+
+      const fullPath = path.join(CHART_DIR, entry);
+
+      // Read + parse + normalise.
+      let raw: unknown;
+      try {
+        raw = await readJson<unknown>(fullPath);
+      } catch (err) {
+        result.skipped.push({ file: entry, reason: `unreadable JSON (${(err as Error).message})` });
+        continue;
+      }
+      const payload = normalizePayload(raw);
+      if (!payload) {
+        result.skipped.push({ file: entry, reason: 'not a recognised chart payload' });
+        continue;
+      }
+
+      // Decide on the final ID + filename.
+      let targetId: string;
+      let finalPath = fullPath;
+      let renamedFromTo: { from: string; to: string } | null = null;
+
+      if (UUID_RE.test(baseId) && !knownIds.has(baseId)) {
+        // Filename is already a fresh UUID — keep it.
+        targetId = baseId;
+      } else {
+        // Non-UUID name → mint a fresh UUID and rename the file.
+        targetId = randomUUID();
+        const newName = `${targetId}.json`;
+        const newPath = path.join(CHART_DIR, newName);
+        try {
+          await fs.rename(fullPath, newPath);
+          finalPath = newPath;
+          renamedFromTo = { from: entry, to: newName };
+        } catch (err) {
+          result.skipped.push({
+            file: entry,
+            reason: `failed to rename to ${newName}: ${(err as Error).message}`,
+          });
+          continue;
+        }
+      }
+
+      // Pull the file's mtime as createdAt — gives a sensible ordering when
+      // multiple files are auto-imported in one boot.
+      let createdAt: string;
+      try {
+        const stat = await fs.stat(finalPath);
+        createdAt = stat.mtime.toISOString();
+      } catch {
+        createdAt = new Date().toISOString();
+      }
+
+      // Recompute ETag canonically so a hand-edited file matches the API.
+      const etag = computeEtag(payload);
+
+      const isFirst = index.length === 0;
+      const newEntry: ChartIndexEntry = {
+        id: targetId,
+        name: nameFromFilename(entry),
+        tags: [],
+        default: isFirst,
+        createdAt,
+        updatedAt: createdAt,
+        etag,
+        nodeCount: payload.nodes.length,
+        departmentCount: Object.keys(payload.departments).length,
+      };
+
+      // If we kept the file as-is but its content drifted from the bare
+      // payload (e.g. v3 envelope), normalise on disk so subsequent reads
+      // are predictable.
+      if (Array.isArray(raw) || (raw as Record<string, unknown>).version != null) {
+        await writeJson(finalPath, payload);
+      }
+
+      index.push(newEntry);
+      knownIds.add(targetId);
+      mutated = true;
+
+      if (renamedFromTo) result.renamed.push(renamedFromTo);
+      result.imported.push({ id: targetId, name: newEntry.name, from: entry });
+    }
+
+    if (mutated) {
+      await writeIndex(index);
+    }
+
+    return result;
+  });
+}
+
+/* --------------------------------------------------------------------- */
 /*  Helpers                                                              */
 /* --------------------------------------------------------------------- */
 
