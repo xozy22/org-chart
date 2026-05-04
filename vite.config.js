@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite';
 
 // Backend dev-server URL — override with `BACKEND_URL=http://...` if needed.
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
+// Defaults to the Express dev server's port (3000) defined in backend/.
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
 
 export default defineConfig({
   server: {

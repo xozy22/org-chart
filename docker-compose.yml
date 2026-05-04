@@ -1,54 +1,29 @@
-# docker-compose for the full Org-Chart Builder stack:
+# Single-container deployment for Org-Chart Builder.
 #
-#   - org-chart-frontend  (nginx, serves the SPA + proxies /api/ to backend)
-#   - org-chart-backend   (Express, JSON-file storage on /app/data)
-#
-# All chart payloads live in ./data on the host (mounted into the backend
-# container). Per-user view-state (free-layout positions, layout mode)
-# stays in the visitor's browser localStorage — the backend doesn't see it.
-#
-# Usage:
 #   docker compose up -d
 #   open http://localhost:8080
 #
-# The backend is intentionally exposed only to the frontend container, not
-# to the host port. If you want direct API access (curl / scripts), add
-# `ports: - "3000:3000"` to the org-chart-backend service.
+# Charts are persisted to ./data on the host (mounted at /app/data inside
+# the container). Override the host path via the ORG_CHART_DATA env var
+# or by editing the volume line directly. See README → "Storage & volume
+# mount" for bind-mounts vs. named volumes vs. UID/GID workarounds.
 
 services:
-  org-chart-frontend:
+  org-chart:
     image: ghcr.io/xozy22/org-chart:latest
     build: .
-    container_name: org-chart-frontend
+    container_name: org-chart
     restart: unless-stopped
     ports:
-      - "8080:80"
-    depends_on:
-      org-chart-backend:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/", "-O", "/dev/null"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-
-  org-chart-backend:
-    image: ghcr.io/xozy22/org-chart-backend:latest
-    build: ./backend
-    container_name: org-chart-backend
-    restart: unless-stopped
-    expose:
-      - "3000"
+      - "8080:3000"
     volumes:
-      # Persistent chart storage. The backend creates the
-      # `charts.index.json` and `charts/<id>.json` files inside this dir.
-      - ./data:/app/data
+      - ${ORG_CHART_DATA:-./data}:/app/data
     environment:
       - PORT=3000
       - CORS_ORIGIN=*
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/healthz"]
       interval: 30s
-      timeout: 5s
+      timeout: 3s
       retries: 3
       start_period: 5s

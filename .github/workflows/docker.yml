@@ -10,6 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  IMAGE_NAME: org-chart
 
 concurrency:
   group: docker-${{ github.ref }}
@@ -17,25 +18,11 @@ concurrency:
 
 jobs:
   build-and-push:
-    name: Build ${{ matrix.image.name }}
+    name: Build & push image
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        image:
-          - name: org-chart
-            context: .
-            dockerfile: Dockerfile
-            title: Org-Chart Builder
-            description: Browser-based organisational chart builder (TypeScript + d3-org-chart)
-          - name: org-chart-backend
-            context: ./backend
-            dockerfile: Dockerfile
-            title: Org-Chart Builder backend
-            description: REST API for shared chart storage (Node + Express + TypeScript)
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,7 +45,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image.name }}
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -67,23 +54,23 @@ jobs:
             type=sha,prefix=sha-,format=short
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
-            org.opencontainers.image.title=${{ matrix.image.title }}
-            org.opencontainers.image.description=${{ matrix.image.description }}
+            org.opencontainers.image.title=Org-Chart Builder
+            org.opencontainers.image.description=Browser-based organisational chart builder with optional shared backend (TypeScript + d3-org-chart + Express)
             org.opencontainers.image.licenses=MIT
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.image.context }}
-          file: ${{ matrix.image.context }}/${{ matrix.image.dockerfile }}
+          context: .
+          file: Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
-          cache-from: type=gha,scope=${{ matrix.image.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           provenance: false
 
       - name: Image digest
         if: github.event_name != 'pull_request'
-        run: echo "Pushed ${{ matrix.image.name }} → ${{ steps.meta.outputs.tags }}"
+        run: echo "Pushed ${{ env.IMAGE_NAME }} → ${{ steps.meta.outputs.tags }}"
