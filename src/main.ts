@@ -416,7 +416,12 @@ async function loadChartIntoStore(id: string): Promise<void> {
   }
 }
 
+/** Last known display name of the active chart — also used by JSON export
+ *  so the downloaded filename includes a meaningful identifier. */
+let activeChartName: string | null = null;
+
 function updateCurrentChartLabel(name: string | null): void {
+  activeChartName = name;
   const btn = document.getElementById('btn-workspaces') as HTMLButtonElement | null;
   if (!btn) return;
   if (name) btn.innerHTML = `🗂 ${escapeForLabel(name)}`;
@@ -471,7 +476,7 @@ function bindToolbar() {
     }
   });
   document.getElementById('btn-export-json').addEventListener('click', () => {
-    exportJson(store.get(), store.departments, store.customFields);
+    exportJson(store.get(), store.departments, store.customFields, activeChartName);
     toast('JSON heruntergeladen');
   });
 

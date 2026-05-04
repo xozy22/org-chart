@@ -14,13 +14,47 @@ function downloadBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function exportJson(nodes, departments = {}, customFields = []) {
+/**
+ * Sanitize a chart name for safe filesystem use:
+ *   - strip / \ : * ? " < > | (Windows-illegal) and control chars
+ *   - collapse whitespace runs to single underscores
+ *   - cap to 80 chars
+ *   - fall back to a sensible default when the result is empty
+ */
+function sanitizeFilename(raw: string | null | undefined): string {
+  if (!raw) return 'org-chart';
+  const cleaned = String(raw)
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 80)
+    .trim();
+  return cleaned || 'org-chart';
+}
+
+export function exportJson(
+  nodes,
+  departments = {},
+  customFields = [],
+  chartName: string | null = null,
+) {
   // v3 format: object with nodes, department colours and custom-field schema.
   // v2 (no customFields) and the bare-array form are still accepted on import.
   const payload = { version: 3, nodes, departments, customFields };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const ts = new Date().toISOString().slice(0, 10);
-  downloadBlob(blob, `org-chart-${ts}.json`);
+
+  // Build filename: <sanitized-chart-name>_<YYYY-MM-DD>.json. The trailing
+  // ".json" is appended in a separate step so it can never be lost in
+  // template-string interpolation, and we re-check it explicitly before the
+  // download trigger.
+  const baseName = sanitizeFilename(chartName);
+  const dateStr = new Date().toISOString().slice(0, 10);
+  let filename = `${baseName}_${dateStr}.json`;
+  if (!filename.toLowerCase().endsWith('.json')) filename = `${filename}.json`;
+
+  downloadBlob(blob, filename);
 }
 
 function readFileAsText(file: File): Promise<string> {
