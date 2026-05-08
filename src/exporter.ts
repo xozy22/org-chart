@@ -240,18 +240,35 @@ function loadImage(src) {
   });
 }
 
-async function rasterToPng(svgEl: SVGElement, width: number, height: number): Promise<string> {
+type RasterOpts = {
+  /** Output pixel multiplier vs the SVG's own coordinate system. */
+  pixelRatio?: number;
+  /** "image/png" (lossless, big) or "image/jpeg" (lossy, much smaller). */
+  format?: 'image/png' | 'image/jpeg';
+  /** JPEG quality 0..1. Ignored for PNG. */
+  quality?: number;
+};
+
+async function rasterToDataUrl(
+  svgEl: SVGElement,
+  width: number,
+  height: number,
+  opts: RasterOpts = {},
+): Promise<string> {
+  const { pixelRatio = PIXEL_RATIO, format = 'image/png', quality } = opts;
   const xml = serializeSvg(svgEl);
   const dataUrl = svgStringToDataUrl(xml);
   const img = await loadImage(dataUrl);
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(width * PIXEL_RATIO);
-  canvas.height = Math.round(height * PIXEL_RATIO);
+  canvas.width = Math.max(1, Math.round(width * pixelRatio));
+  canvas.height = Math.max(1, Math.round(height * pixelRatio));
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img as HTMLImageElement, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/png');
+  return format === 'image/jpeg'
+    ? canvas.toDataURL('image/jpeg', quality ?? 0.92)
+    : canvas.toDataURL('image/png');
 }
 
 /* -------------------------------------------------------------------- */
@@ -260,7 +277,9 @@ async function rasterToPng(svgEl: SVGElement, width: number, height: number): Pr
 
 export async function exportPng(chart) {
   const ctx = await prepareExportSvg(chart);
-  const dataUrl = await rasterToPng(ctx.clone, ctx.width, ctx.height);
+  const dataUrl = await rasterToDataUrl(ctx.clone, ctx.width, ctx.height, {
+    format: 'image/png',
+  });
   downloadHref(dataUrl, `org-chart-${ts()}.png`);
 }
 
@@ -278,7 +297,6 @@ export async function exportSvg(chart) {
 
 export async function exportPdf(chart) {
   const ctx = await prepareExportSvg(chart);
-  const dataUrl = await rasterToPng(ctx.clone, ctx.width, ctx.height);
 
   const orientation = ctx.width >= ctx.height ? 'landscape' : 'portrait';
   const pdf = new jsPDF({ orientation, unit: 'pt', format: 'a4' });
@@ -292,6 +310,23 @@ export async function exportPdf(chart) {
   const h = ctx.height * ratio;
   const x = (pageW - w) / 2;
   const y = (pageH - h) / 2;
-  pdf.addImage(dataUrl, 'PNG', x, y, w, h);
+
+  // Render the bitmap at the resolution the PDF actually consumes
+  // instead of `chart_size × 2`. PDF user units are 1/72 inch, so
+  // (w / ctx.width) is the SVG-px → PDF-pt ratio; multiplying by
+  // (TARGET_DPI / 72) gives the SVG-px → output-px ratio. At 200 DPI
+  // every print fits the page sharply, but the embedded bitmap is a
+  // fraction of what the previous 2× pass produced. JPEG @ 0.92 is
+  // visually indistinguishable from PNG for this content and another
+  // 5–10× smaller on top.
+  const TARGET_DPI = 200;
+  const pixelRatio = (w / ctx.width) * (TARGET_DPI / 72);
+  const dataUrl = await rasterToDataUrl(ctx.clone, ctx.width, ctx.height, {
+    pixelRatio,
+    format: 'image/jpeg',
+    quality: 0.92,
+  });
+
+  pdf.addImage(dataUrl, 'JPEG', x, y, w, h, undefined, 'FAST');
   pdf.save(`org-chart-${ts()}.pdf`);
 }
