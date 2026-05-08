@@ -90,7 +90,7 @@ docker compose up -d        # → http://localhost:8080
 |---|---|
 | **Undo / redo** | 50-step history with toolbar buttons, `Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`. Covers every edit, drag, bulk action and layout-mode toggle. |
 | **Country flags** | 59 countries via [`flag-icons`](https://github.com/lipis/flag-icons), datalist autocomplete by name or ISO-2 code. |
-| **Image export** | High-quality PNG (2× pixel ratio), self-contained SVG, compact A4 PDF (JPEG @ 200 DPI, ~150 KB for a typical chart — small enough to email). Every CSS rule, custom property and flag image is inlined so the export matches the live view. |
+| **Image export** | High-quality PNG (2× pixel ratio), self-contained SVG, compact PDF (JPEG @ 200 DPI). Page size auto-scales A4 → A3 → A2 → A1 → A0 so cards stay readable on any chart size; a typical small chart lands at ~150 KB on A4. Every CSS rule, custom property and flag image is inlined so the export matches the live view. |
 | **JSON / CSV import & export** | v3 envelope with nodes, departments and custom-fields schema; legacy v2 + bare-array forms still accepted. Avatar uploads are inlined as `data:` URIs on export and re-hosted on import — a JSON exported on one host imports lossless on another. |
 
 ![Edit modal](docs/screenshot-edit-modal.png)

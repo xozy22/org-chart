@@ -295,19 +295,69 @@ export async function exportSvg(chart) {
   }
 }
 
+/* -------------------------------------------------------------------- */
+/*  PDF page-size selection                                              */
+/* -------------------------------------------------------------------- */
+
+/** ISO 216 A-series in PDF points (1 pt = 1/72 inch), short-edge ascending. */
+const A_SERIES_SHORT = { a4: 595, a3: 842, a2: 1191, a1: 1684, a0: 2384 };
+const A_SERIES_LONG = { a4: 842, a3: 1191, a2: 1684, a1: 2384, a0: 3370 };
+const A_FORMATS = ['a4', 'a3', 'a2', 'a1', 'a0'] as const;
+type AFormat = (typeof A_FORMATS)[number];
+
+/** Card width in SVG coordinates — must stay in sync with `nodeWidth` in chart.ts. */
+const SVG_CARD_WIDTH = 270;
+/** Minimum on-page card width before names become hard to read.
+ *  72 pt = 1 inch ≈ 2.54 cm — small but still legible at 200 DPI.
+ *  Below this we step up to the next A-size. */
+const MIN_CARD_PT = 72;
+const PDF_MARGIN_PT = 24;
+
+/**
+ * Pick the smallest A-series page size where each card still gets at
+ * least MIN_CARD_PT of horizontal real estate. Falls back to A0 for
+ * truly enormous charts — at that point the user almost certainly
+ * wants a plotter or split exports, but a too-tight A0 is still more
+ * useful than a blurry A4.
+ */
+function pickPdfFormat(svgW: number, svgH: number): {
+  format: AFormat;
+  orientation: 'landscape' | 'portrait';
+  pageW: number;
+  pageH: number;
+  pageRatio: number;
+} {
+  const orientation: 'landscape' | 'portrait' =
+    svgW >= svgH ? 'landscape' : 'portrait';
+  for (const fmt of A_FORMATS) {
+    const long = A_SERIES_LONG[fmt];
+    const short = A_SERIES_SHORT[fmt];
+    const pageW = orientation === 'landscape' ? long : short;
+    const pageH = orientation === 'landscape' ? short : long;
+    const usableW = pageW - PDF_MARGIN_PT * 2;
+    const usableH = pageH - PDF_MARGIN_PT * 2;
+    const pageRatio = Math.min(usableW / svgW, usableH / svgH);
+    if (SVG_CARD_WIDTH * pageRatio >= MIN_CARD_PT || fmt === 'a0') {
+      return { format: fmt, orientation, pageW, pageH, pageRatio };
+    }
+  }
+  // Unreachable — the loop returns on a0 if nothing else matched.
+  throw new Error('No PDF format selected');
+}
+
 export async function exportPdf(chart) {
   const ctx = await prepareExportSvg(chart);
 
-  const orientation = ctx.width >= ctx.height ? 'landscape' : 'portrait';
-  const pdf = new jsPDF({ orientation, unit: 'pt', format: 'a4' });
-  const pageW = pdf.internal.pageSize.getWidth();
-  const pageH = pdf.internal.pageSize.getHeight();
-  const margin = 24;
-  const usableW = pageW - margin * 2;
-  const usableH = pageH - margin * 2;
-  const ratio = Math.min(usableW / ctx.width, usableH / ctx.height);
-  const w = ctx.width * ratio;
-  const h = ctx.height * ratio;
+  // Pick the smallest standard page that keeps cards readable. Most
+  // charts fit A4; very large ones step up through A3/A2/A1/A0.
+  const { format, orientation, pageW, pageH, pageRatio } = pickPdfFormat(
+    ctx.width,
+    ctx.height,
+  );
+  const pdf = new jsPDF({ orientation, unit: 'pt', format });
+
+  const w = ctx.width * pageRatio;
+  const h = ctx.height * pageRatio;
   const x = (pageW - w) / 2;
   const y = (pageH - h) / 2;
 
